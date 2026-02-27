@@ -162,6 +162,29 @@ class BMADBackend {
     throw new Error('Session manager not available');
   }
 
+  async deleteSession(sessionId) {
+    // Remove from session manager if available
+    if (this._sessionManager) {
+      try {
+        // Try suspending first to clean up state
+        if (this._sessionManager.activeSessions.has(sessionId)) {
+          await this._sessionManager.suspendSession(sessionId);
+        }
+        this._sessionManager.activeSessions.delete(sessionId);
+      } catch { /* ignore */ }
+    }
+    // Remove session file from disk
+    try {
+      const sessionFile = path.join(this.basePath, 'sessions', `${sessionId}.json`);
+      await fs.unlink(sessionFile);
+    } catch { /* file may not exist */ }
+    // Also clean up any associated chat
+    try {
+      this._aiService.clearChat(sessionId);
+    } catch { /* ignore */ }
+    return { success: true, sessionId };
+  }
+
   // ─── Queue ──────────────────────────────────────────────────────────────
   async listMessages(status = 'active') {
     if (this._messageQueue) {

@@ -119,7 +119,7 @@ class OllamaProvider {
 
   async listModels() {
     try {
-      const response = await this._fetch('/api/tags', null, 'GET');
+      const response = await this._fetch('/api/tags', null, 'GET', 5000);
       return (response.models || []).map(m => ({
         id: m.name,
         name: m.name,
@@ -133,23 +133,25 @@ class OllamaProvider {
 
   async isAvailable() {
     try {
-      await this._fetch('/api/tags', null, 'GET');
+      await this._fetch('/api/tags', null, 'GET', 5000);
       return true;
     } catch {
       return false;
     }
   }
 
-  _fetch(endpoint, body, method = 'POST') {
+  _fetch(endpoint, body, method = 'POST', timeout = 0) {
     return new Promise((resolve, reject) => {
       const url = new URL(endpoint, this.baseUrl);
       const reqModule = url.protocol === 'https:' ? https : http;
 
-      const req = reqModule.request(url, {
+      const options = {
         method,
         headers: body ? { 'Content-Type': 'application/json' } : {},
-        timeout: 5000
-      }, (res) => {
+      };
+      if (timeout > 0) options.timeout = timeout;
+
+      const req = reqModule.request(url, options, (res) => {
         let data = '';
         res.on('data', (chunk) => data += chunk);
         res.on('end', () => {
@@ -158,8 +160,12 @@ class OllamaProvider {
         });
       });
 
-      req.on('error', reject);
-      req.on('timeout', () => { req.destroy(); reject(new Error('Ollama connection timeout')); });
+      req.on('error', (err) => {
+        reject(new Error(`OLLAMA_CONNECTION_ERROR: ${err.message}. Est-ce qu'Ollama est lancé ?`));
+      });
+      if (timeout > 0) {
+        req.on('timeout', () => { req.destroy(); reject(new Error('OLLAMA_CONNECTION_ERROR: Timeout de connexion. Est-ce qu\'Ollama est lancé ?')); });
+      }
       if (body) req.write(body);
       req.end();
     });
@@ -347,7 +353,15 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
       messages: [],
       createdAt: Date.now()
     });
-    return await this.sendMessage(sessionId, null);
+
+    // Use non-streaming for greeting but with proper error handling
+    try {
+      return await this.sendMessage(sessionId, null);
+    } catch (error) {
+      // Clean up the conversation on failure
+      this.conversations.delete(sessionId);
+      throw error;
+    }
   }
 
   async sendMessage(sessionId, userMessage) {

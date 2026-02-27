@@ -110,6 +110,7 @@ function registerIpcHandlers() {
   ipcMain.handle('sessions:switch', (_, sessionId) => backend.switchSession(sessionId));
   ipcMain.handle('sessions:suspend', (_, sessionId) => backend.suspendSession(sessionId));
   ipcMain.handle('sessions:resume', (_, sessionId) => backend.resumeSession(sessionId));
+  ipcMain.handle('sessions:delete', (_, sessionId) => backend.deleteSession(sessionId));
 
   // Queue
   ipcMain.handle('queue:list', (_, status) => backend.listMessages(status));

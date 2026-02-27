@@ -47,6 +47,7 @@ const api = {
     switch: async (id) => isElectron ? window.bmadAPI.sessions.switch(id) : {},
     suspend: async (id) => isElectron ? window.bmadAPI.sessions.suspend(id) : {},
     resume: async (id) => isElectron ? window.bmadAPI.sessions.resume(id) : {},
+    delete: async (id) => isElectron ? window.bmadAPI.sessions.delete(id) : {},
   },
 
   queue: {

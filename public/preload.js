@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('bmadAPI', {
     switch: (sessionId) => ipcRenderer.invoke('sessions:switch', sessionId),
     suspend: (sessionId) => ipcRenderer.invoke('sessions:suspend', sessionId),
     resume: (sessionId) => ipcRenderer.invoke('sessions:resume', sessionId),
+    delete: (sessionId) => ipcRenderer.invoke('sessions:delete', sessionId),
   },
 
   // Queue

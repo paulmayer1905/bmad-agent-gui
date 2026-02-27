@@ -39,6 +39,12 @@ export default function Sessions() {
     loadData();
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette session ?')) return;
+    await api.sessions.delete(id);
+    loadData();
+  };
+
   const activeSessions = sessions.filter(s => s.status === 'active');
   const suspendedSessions = sessions.filter(s => s.status === 'suspended');
   const otherSessions = sessions.filter(s => s.status !== 'active' && s.status !== 'suspended');
@@ -91,7 +97,7 @@ export default function Sessions() {
                 <h3 style={{ marginBottom: 12, fontSize: 16 }}>🟢 Active Sessions</h3>
                 <div style={{ display: 'grid', gap: 12 }}>
                   {activeSessions.map(session => (
-                    <SessionCard key={session.id} session={session} onSuspend={handleSuspend} onResume={handleResume} />
+                    <SessionCard key={session.id} session={session} onSuspend={handleSuspend} onResume={handleResume} onDelete={handleDelete} />
                   ))}
                 </div>
               </div>
@@ -103,7 +109,7 @@ export default function Sessions() {
                 <h3 style={{ marginBottom: 12, fontSize: 16 }}>🟡 Suspended Sessions</h3>
                 <div style={{ display: 'grid', gap: 12 }}>
                   {suspendedSessions.map(session => (
-                    <SessionCard key={session.id} session={session} onSuspend={handleSuspend} onResume={handleResume} />
+                    <SessionCard key={session.id} session={session} onSuspend={handleSuspend} onResume={handleResume} onDelete={handleDelete} />
                   ))}
                 </div>
               </div>
@@ -190,7 +196,7 @@ export default function Sessions() {
   );
 }
 
-function SessionCard({ session, onSuspend, onResume }) {
+function SessionCard({ session, onSuspend, onResume, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const historyLen = session.context?.conversationHistory?.length || 0;
 
@@ -210,6 +216,7 @@ function SessionCard({ session, onSuspend, onResume }) {
           {session.status === 'suspended' && (
             <button className="btn btn-sm btn-primary" onClick={() => onResume(session.id)}>▶ Resume</button>
           )}
+          <button className="btn btn-sm btn-ghost" style={{ color: 'var(--accent-red, #ef4444)' }} onClick={() => onDelete(session.id)} title="Supprimer">🗑️</button>
           <button className="btn btn-sm btn-ghost" onClick={() => setExpanded(!expanded)}>
             {expanded ? '▲' : '▼'} Details
           </button>
