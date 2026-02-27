@@ -7,6 +7,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
+const AIService = require('./ai-service');
 
 class BMADBackend {
   constructor(options = {}) {
@@ -20,6 +21,11 @@ class BMADBackend {
     this._elicitationBroker = null;
     this._sessionManager = null;
     this._bmadLoader = null;
+
+    // AI Chat service
+    this._aiService = new AIService({
+      configPath: path.join(this.basePath, 'ai-config.json')
+    });
   }
 
   async initialize() {
@@ -44,6 +50,9 @@ class BMADBackend {
     } catch (err) {
       console.warn('Could not load BMAD core modules, running in standalone mode:', err.message);
     }
+
+    // Initialize AI service
+    await this._aiService.initialize();
   }
 
   // ─── Agents ─────────────────────────────────────────────────────────────
@@ -354,6 +363,56 @@ class BMADBackend {
       } catch { /* continue */ }
     }
     throw new Error(`Task ${name} not found`);
+  }
+
+  // ─── Chat / AI ───────────────────────────────────────────────────────
+  async startChat(agentName) {
+    const agent = await this.getAgent(agentName);
+    const metadata = await this.getAgentMetadata(agentName);
+    const sessionId = `chat-${agentName}-${Date.now()}`;
+    const displayName = metadata.title || metadata.name || agentName;
+    
+    const result = await this._aiService.startChat(sessionId, agent.rawContent, displayName);
+    return {
+      sessionId,
+      agentName,
+      agentTitle: displayName,
+      agentIcon: metadata.icon || '🤖',
+      greeting: result.content,
+      usage: result.usage
+    };
+  }
+
+  async sendChatMessage(sessionId, message) {
+    return await this._aiService.sendMessage(sessionId, message);
+  }
+
+  async streamChatMessage(sessionId, message, onChunk) {
+    return await this._aiService.streamMessage(sessionId, message, onChunk);
+  }
+
+  getChatHistory(sessionId) {
+    return this._aiService.getHistory(sessionId);
+  }
+
+  clearChat(sessionId) {
+    return this._aiService.clearChat(sessionId);
+  }
+
+  listChats() {
+    return this._aiService.listChats();
+  }
+
+  async getAIConfig() {
+    return await this._aiService.getConfig();
+  }
+
+  async updateAIConfig(config) {
+    return await this._aiService.saveConfig(config);
+  }
+
+  isAIConfigured() {
+    return this._aiService.isConfigured();
   }
 
   // ─── System ─────────────────────────────────────────────────────────────

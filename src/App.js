@@ -4,6 +4,8 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Agents from './pages/Agents';
 import AgentDetail from './pages/AgentDetail';
+import AgentChat from './pages/AgentChat';
+import AISettings from './pages/AISettings';
 import Sessions from './pages/Sessions';
 import QueueMonitor from './pages/QueueMonitor';
 import Workflows from './pages/Workflows';
@@ -32,6 +34,9 @@ function AppInner() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/agents/:name" element={<AgentDetail />} />
+          <Route path="/chat" element={<AgentChat />} />
+          <Route path="/chat/:agentName" element={<AgentChat />} />
+          <Route path="/ai-settings" element={<AISettings />} />
           <Route path="/sessions" element={<Sessions />} />
           <Route path="/queue" element={<QueueMonitor />} />
           <Route path="/workflows" element={<Workflows />} />

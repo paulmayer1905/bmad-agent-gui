@@ -137,6 +137,34 @@ function registerIpcHandlers() {
   // System
   ipcMain.handle('system:info', () => backend.getSystemInfo());
   ipcMain.handle('system:health', () => backend.getHealthCheck());
+
+  // Chat / AI
+  ipcMain.handle('chat:start', (_, agentName) => backend.startChat(agentName));
+  ipcMain.handle('chat:send', (_, sessionId, message) => backend.sendChatMessage(sessionId, message));
+  ipcMain.handle('chat:history', (_, sessionId) => backend.getChatHistory(sessionId));
+  ipcMain.handle('chat:clear', (_, sessionId) => backend.clearChat(sessionId));
+  ipcMain.handle('chat:list', () => backend.listChats());
+  ipcMain.handle('ai:config:get', () => backend.getAIConfig());
+  ipcMain.handle('ai:config:update', (_, config) => backend.updateAIConfig(config));
+  ipcMain.handle('ai:configured', () => backend.isAIConfigured());
+
+  // Streaming chat (uses IPC events instead of invoke)
+  ipcMain.on('chat:stream', async (event, sessionId, message) => {
+    try {
+      const result = await backend.streamChatMessage(sessionId, message, (chunk) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('chat:stream:chunk', sessionId, chunk);
+        }
+      });
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('chat:stream:done', sessionId, result);
+      }
+    } catch (error) {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('chat:stream:error', sessionId, error.message);
+      }
+    }
+  });
 }
 
 // ─── App Lifecycle ──────────────────────────────────────────────────────────

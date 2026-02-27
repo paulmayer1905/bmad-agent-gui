@@ -49,9 +49,15 @@ export default function AgentDetail() {
             <h2>{metadata?.icon || '🤖'} {metadata?.title || agent.title || name}</h2>
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{name}</p>
           </div>
-          <div style={{ marginLeft: 'auto' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <button
               className="btn btn-primary"
+              onClick={() => navigate(`/chat/${name}`)}
+            >
+              💬 Chat
+            </button>
+            <button
+              className="btn btn-ghost"
               onClick={() => api.sessions.create(name, {}).then(() => navigate('/sessions'))}
             >
               🚀 Start Session

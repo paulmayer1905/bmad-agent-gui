@@ -6,8 +6,9 @@ const navItems = [
   { section: 'Overview' },
   { path: '/', icon: '📊', label: 'Dashboard' },
   { section: 'Agents' },
-  { path: '/agents', icon: '🤖', label: 'All Agents' },
-  { path: '/sessions', icon: '💬', label: 'Sessions' },
+  { path: '/chat', icon: '💬', label: 'Chat Agent', highlight: true },
+  { path: '/agents', icon: '🤖', label: 'Tous les Agents' },
+  { path: '/sessions', icon: '🔄', label: 'Sessions' },
   { section: 'Operations' },
   { path: '/queue', icon: '📨', label: 'Queue Monitor' },
   { path: '/workflows', icon: '🔀', label: 'Workflows' },
@@ -15,6 +16,7 @@ const navItems = [
   { path: '/checklists', icon: '✅', label: 'Checklists' },
   { path: '/tasks', icon: '📝', label: 'Tasks' },
   { section: 'System' },
+  { path: '/ai-settings', icon: '🤖', label: 'Paramètres IA' },
   { path: '/config', icon: '⚙️', label: 'Configuration' },
 ];
 

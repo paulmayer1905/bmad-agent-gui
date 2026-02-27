@@ -14,19 +14,20 @@
     "test": "react-scripts test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "js-yaml": "^4.1.0",
+    "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
     "react-scripts": "5.0.1",
-    "js-yaml": "^4.1.0",
-    "lucide-react": "^0.460.0",
     "recharts": "^2.13.0"
   },
   "devDependencies": {
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8",
     "concurrently": "^9.1.0",
     "cross-env": "^7.0.3",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
     "wait-on": "^8.0.1"
   },
   "build": {

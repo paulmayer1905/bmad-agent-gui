@@ -57,6 +57,35 @@ contextBridge.exposeInMainWorld('bmadAPI', {
     health: () => ipcRenderer.invoke('system:health'),
   },
 
+  // Chat / AI
+  chat: {
+    start: (agentName) => ipcRenderer.invoke('chat:start', agentName),
+    send: (sessionId, message) => ipcRenderer.invoke('chat:send', sessionId, message),
+    stream: (sessionId, message) => ipcRenderer.send('chat:stream', sessionId, message),
+    onStreamChunk: (callback) => {
+      ipcRenderer.on('chat:stream:chunk', (_, sessionId, chunk) => callback(sessionId, chunk));
+      return () => ipcRenderer.removeAllListeners('chat:stream:chunk');
+    },
+    onStreamDone: (callback) => {
+      ipcRenderer.on('chat:stream:done', (_, sessionId, result) => callback(sessionId, result));
+      return () => ipcRenderer.removeAllListeners('chat:stream:done');
+    },
+    onStreamError: (callback) => {
+      ipcRenderer.on('chat:stream:error', (_, sessionId, error) => callback(sessionId, error));
+      return () => ipcRenderer.removeAllListeners('chat:stream:error');
+    },
+    history: (sessionId) => ipcRenderer.invoke('chat:history', sessionId),
+    clear: (sessionId) => ipcRenderer.invoke('chat:clear', sessionId),
+    list: () => ipcRenderer.invoke('chat:list'),
+  },
+
+  // AI Config
+  ai: {
+    getConfig: () => ipcRenderer.invoke('ai:config:get'),
+    updateConfig: (config) => ipcRenderer.invoke('ai:config:update', config),
+    isConfigured: () => ipcRenderer.invoke('ai:configured'),
+  },
+
   // Navigation events from menu
   onNavigate: (callback) => {
     ipcRenderer.on('navigate', (_, path) => callback(path));

@@ -93,6 +93,73 @@ const api = {
     info: async () => isElectron ? window.bmadAPI.system.info() : { bmadRoot: '/mock', coreModulesLoaded: false, nodeVersion: 'v20', platform: 'browser' },
     health: async () => isElectron ? window.bmadAPI.system.health() : { status: 'healthy', checks: { coreModules: true, bmadLoader: true, agentsDir: true, queueDir: true, configFile: true } },
   },
+
+  // Chat / AI
+  chat: {
+    start: async (agentName) => {
+      if (isElectron) return window.bmadAPI.chat.start(agentName);
+      // Mock for browser dev
+      return {
+        sessionId: `chat-${agentName}-${Date.now()}`,
+        agentName,
+        agentTitle: agentName,
+        agentIcon: '🤖',
+        greeting: `Bonjour ! Je suis l'agent **${agentName}**. Comment puis-je vous aider ?`,
+        usage: { input_tokens: 0, output_tokens: 0 }
+      };
+    },
+    send: async (sessionId, message) => {
+      if (isElectron) return window.bmadAPI.chat.send(sessionId, message);
+      return {
+        content: `[Mode navigateur] Réponse simulée à : "${message}"`,
+        usage: { input_tokens: 10, output_tokens: 20 },
+        model: 'mock',
+        stopReason: 'end_turn'
+      };
+    },
+    stream: (sessionId, message) => {
+      if (isElectron) window.bmadAPI.chat.stream(sessionId, message);
+    },
+    onStreamChunk: (callback) => {
+      if (isElectron) return window.bmadAPI.chat.onStreamChunk(callback);
+      return () => {};
+    },
+    onStreamDone: (callback) => {
+      if (isElectron) return window.bmadAPI.chat.onStreamDone(callback);
+      return () => {};
+    },
+    onStreamError: (callback) => {
+      if (isElectron) return window.bmadAPI.chat.onStreamError(callback);
+      return () => {};
+    },
+    history: async (sessionId) => {
+      if (isElectron) return window.bmadAPI.chat.history(sessionId);
+      return [];
+    },
+    clear: async (sessionId) => {
+      if (isElectron) return window.bmadAPI.chat.clear(sessionId);
+      return { success: true };
+    },
+    list: async () => {
+      if (isElectron) return window.bmadAPI.chat.list();
+      return [];
+    },
+  },
+
+  ai: {
+    getConfig: async () => {
+      if (isElectron) return window.bmadAPI.ai.getConfig();
+      return { hasApiKey: false, model: 'claude-sonnet-4-20250514', maxTokens: 4096 };
+    },
+    updateConfig: async (config) => {
+      if (isElectron) return window.bmadAPI.ai.updateConfig(config);
+      return config;
+    },
+    isConfigured: async () => {
+      if (isElectron) return window.bmadAPI.ai.isConfigured();
+      return false;
+    },
+  },
 };
 
 export default api;
