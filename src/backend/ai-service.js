@@ -1,5 +1,5 @@
 /**
- * AI Service - Multi-provider LLM integration (Ollama + Anthropic)
+ * AI Service - Multi-provider LLM integration (Ollama + Anthropic + Gemini)
  * Handles LLM interactions for BMAD agent chat
  */
 
@@ -246,6 +246,174 @@ class AnthropicProvider {
   }
 }
 
+// ─── Provider: Google Gemini (free tier available) ────────────────────────
+class GeminiProvider {
+  constructor(config = {}) {
+    this.apiKey = config.apiKey;
+    this.model = config.model || 'gemini-2.0-flash';
+    this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+  }
+
+  async chat(messages, systemPrompt, maxTokens) {
+    if (!this.apiKey) throw new Error('API_KEY_MISSING');
+
+    const contents = messages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+
+    const body = JSON.stringify({
+      contents,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: {
+        maxOutputTokens: maxTokens || 4096,
+      }
+    });
+
+    const url = `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`;
+    const response = await this._fetch(url, body);
+
+    if (response.error) {
+      throw new Error(`GEMINI_ERROR: ${response.error.message || JSON.stringify(response.error)}`);
+    }
+
+    const text = response.candidates?.[0]?.content?.parts
+      ?.map(p => p.text).join('') || '';
+    const usage = response.usageMetadata || {};
+
+    return {
+      content: text,
+      usage: {
+        input_tokens: usage.promptTokenCount || 0,
+        output_tokens: usage.candidatesTokenCount || 0
+      },
+      model: this.model,
+      stopReason: response.candidates?.[0]?.finishReason || 'STOP'
+    };
+  }
+
+  async streamChat(messages, systemPrompt, maxTokens, onChunk) {
+    if (!this.apiKey) throw new Error('API_KEY_MISSING');
+
+    const contents = messages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+
+    const body = JSON.stringify({
+      contents,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: {
+        maxOutputTokens: maxTokens || 4096,
+      }
+    });
+
+    const url = `${this.baseUrl}/models/${this.model}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
+
+    return new Promise((resolve, reject) => {
+      const parsedUrl = new URL(url);
+      const req = https.request(parsedUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }, (res) => {
+        let fullText = '';
+        let buffer = '';
+        let lastUsage = null;
+
+        res.on('data', (chunk) => {
+          buffer += chunk.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr) continue;
+            try {
+              const json = JSON.parse(jsonStr);
+              if (json.usageMetadata) lastUsage = json.usageMetadata;
+              const text = json.candidates?.[0]?.content?.parts
+                ?.map(p => p.text).join('') || '';
+              if (text) {
+                fullText += text;
+                if (onChunk) onChunk({ type: 'text', text });
+              }
+            } catch { /* skip */ }
+          }
+        });
+
+        res.on('end', () => {
+          // Process remaining buffer
+          if (buffer.trim()) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              try {
+                const json = JSON.parse(line.slice(6).trim());
+                if (json.usageMetadata) lastUsage = json.usageMetadata;
+                const text = json.candidates?.[0]?.content?.parts
+                  ?.map(p => p.text).join('') || '';
+                if (text) {
+                  fullText += text;
+                  if (onChunk) onChunk({ type: 'text', text });
+                }
+              } catch { /* skip */ }
+            }
+          }
+          resolve({
+            content: fullText,
+            usage: {
+              input_tokens: lastUsage?.promptTokenCount || 0,
+              output_tokens: lastUsage?.candidatesTokenCount || 0
+            },
+            model: this.model,
+            stopReason: 'STOP'
+          });
+        });
+
+        res.on('error', reject);
+      });
+
+      req.on('error', (err) => {
+        const msg = err.message || err.code || 'connexion échouée';
+        reject(new Error(`GEMINI_CONNECTION_ERROR: ${msg}`));
+      });
+
+      req.write(body);
+      req.end();
+    });
+  }
+
+  _fetch(url, body) {
+    return new Promise((resolve, reject) => {
+      const parsedUrl = new URL(url);
+      const req = https.request(parsedUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try { resolve(JSON.parse(data)); }
+          catch { reject(new Error('Invalid JSON from Gemini API')); }
+        });
+      });
+
+      req.on('error', (err) => {
+        const msg = err.message || err.code || 'connexion échouée';
+        reject(new Error(`GEMINI_CONNECTION_ERROR: ${msg}`));
+      });
+
+      req.write(body);
+      req.end();
+    });
+  }
+
+  async isAvailable() {
+    return !!this.apiKey;
+  }
+}
+
 // ─── AI Service (orchestrates providers) ──────────────────────────────────
 class AIService {
   constructor(options = {}) {
@@ -263,7 +431,8 @@ class AIService {
   async initialize() {
     const config = await this.loadConfig();
     this.providerName = config.provider || 'ollama';
-    this.model = config.model || (this.providerName === 'ollama' ? 'llama3.1' : 'claude-sonnet-4-20250514');
+    const defaultModels = { ollama: 'llama3.1', anthropic: 'claude-sonnet-4-20250514', gemini: 'gemini-2.0-flash' };
+    this.model = config.model || defaultModels[this.providerName] || 'llama3.1';
     this.maxTokens = config.maxTokens || 4096;
     this.ollamaUrl = config.ollamaUrl || 'http://localhost:11434';
     this._initProvider(config);
@@ -273,6 +442,11 @@ class AIService {
     if (this.providerName === 'anthropic') {
       this.provider = new AnthropicProvider({
         apiKey: config.apiKey,
+        model: this.model
+      });
+    } else if (this.providerName === 'gemini') {
+      this.provider = new GeminiProvider({
+        apiKey: config.geminiApiKey,
         model: this.model
       });
     } else {
@@ -312,6 +486,8 @@ class AIService {
       provider: config.provider || 'ollama',
       hasApiKey: !!config.apiKey,
       apiKeyPreview: config.apiKey ? `${config.apiKey.slice(0, 10)}...${config.apiKey.slice(-4)}` : null,
+      hasGeminiKey: !!config.geminiApiKey,
+      geminiKeyPreview: config.geminiApiKey ? `${config.geminiApiKey.slice(0, 8)}...${config.geminiApiKey.slice(-4)}` : null,
       model: config.model || this.model,
       maxTokens: config.maxTokens || this.maxTokens,
       ollamaUrl: config.ollamaUrl || 'http://localhost:11434',
@@ -432,6 +608,8 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
 
   _handleError(error) {
     if (error.message?.startsWith('OLLAMA_CONNECTION_ERROR')) throw error;
+    if (error.message?.startsWith('GEMINI_CONNECTION_ERROR')) throw error;
+    if (error.message?.startsWith('GEMINI_ERROR')) throw error;
     if (error.message?.startsWith('API_KEY_MISSING')) throw error;
     if (error.status === 401) throw new Error('INVALID_API_KEY');
     if (error.status === 429) throw new Error('RATE_LIMITED');
@@ -471,6 +649,7 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
 
   isConfigured() {
     if (this.providerName === 'ollama') return true;
+    if (this.providerName === 'gemini') return !!(this.provider && this.provider.apiKey);
     return !!(this.provider && this.provider.client);
   }
 }

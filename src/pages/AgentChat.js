@@ -69,6 +69,12 @@ export default function AgentChat() {
           provider: 'anthropic',
           error: configured ? null : 'no_api_key'
         });
+      } else if (currentProvider === 'gemini') {
+        setProviderStatus({
+          ready: configured,
+          provider: 'gemini',
+          error: configured ? null : 'no_api_key'
+        });
       }
     };
     load();
@@ -139,9 +145,11 @@ export default function AgentChat() {
     } catch (err) {
       const errMsg = err.message || String(err) || 'Erreur inconnue';
       if (errMsg.includes('API_KEY_MISSING')) {
-        setError('Clé API non configurée. Allez dans Paramètres IA pour ajouter votre clé Anthropic.');
+        setError('Clé API non configurée. Allez dans Paramètres IA pour configurer votre clé.');
       } else if (errMsg.includes('OLLAMA_CONNECTION_ERROR') || errMsg.includes('ECONNREFUSED') || errMsg.includes('connexion')) {
-        setError('Impossible de se connecter à Ollama. Lancez \"ollama serve\" dans un terminal, puis réessayez.');
+        setError('Impossible de se connecter à Ollama. Lancez "ollama serve" dans un terminal, puis réessayez.');
+      } else if (errMsg.includes('GEMINI_ERROR') || errMsg.includes('GEMINI_CONNECTION_ERROR')) {
+        setError('Erreur Gemini : ' + errMsg.replace(/GEMINI_(CONNECTION_)?ERROR:\s*/, ''));
       } else {
         setError(errMsg);
       }
@@ -260,6 +268,18 @@ export default function AgentChat() {
                   ⚙️ Changer de provider
                 </button>
               </div>
+            </>
+          ) : providerStatus.provider === 'gemini' ? (
+            <>
+              <div className="chat-setup-icon">✨</div>
+              <h3>Clé API Gemini requise</h3>
+              <p>Pour discuter avec les agents via Google Gemini, configurez votre clé API gratuite.</p>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+                Obtenez-la sur <span style={{ color: 'var(--accent-purple-light)' }}>aistudio.google.com/apikey</span>
+              </p>
+              <button className="btn btn-primary" onClick={() => navigate('/ai-settings')}>
+                Configurer la clé API Gemini
+              </button>
             </>
           ) : (
             <>

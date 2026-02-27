@@ -18,6 +18,13 @@ const OLLAMA_SUGGESTED = [
   { id: 'deepseek-coder-v2', name: 'DeepSeek Coder V2', description: 'Excellent pour le code' },
 ];
 
+const GEMINI_MODELS = [
+  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Rapide et gratuit, très bon généraliste' },
+  { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', description: 'Ultra rapide, réponses courtes' },
+  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Plus capable, contexte 1M tokens' },
+  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Bon équilibre vitesse/qualité' },
+];
+
 export default function AISettings() {
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
@@ -32,6 +39,8 @@ export default function AISettings() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
   const [showKey, setShowKey] = useState(false);
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [checkingOllama, setCheckingOllama] = useState(false);
 
   useEffect(() => {
@@ -70,6 +79,8 @@ export default function AISettings() {
     setProvider(p);
     if (p === 'ollama') {
       setModel('llama3.1');
+    } else if (p === 'gemini') {
+      setModel('gemini-2.0-flash');
     } else {
       setModel('claude-sonnet-4-20250514');
     }
@@ -82,10 +93,12 @@ export default function AISettings() {
     try {
       const updates = { provider, model, maxTokens, ollamaUrl };
       if (apiKey) updates.apiKey = apiKey;
+      if (geminiApiKey) updates.geminiApiKey = geminiApiKey;
       await api.ai.updateConfig(updates);
       const cfg = await api.ai.getConfig();
       setConfig(cfg);
       setApiKey('');
+      setGeminiApiKey('');
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
@@ -97,6 +110,7 @@ export default function AISettings() {
 
   const availableModels = provider === 'ollama'
     ? (ollamaModels.length > 0 ? ollamaModels : OLLAMA_SUGGESTED)
+    : provider === 'gemini' ? GEMINI_MODELS
     : ANTHROPIC_MODELS;
 
   const isOllamaModelInstalled = (modelId) => {
@@ -143,6 +157,19 @@ export default function AISettings() {
                   <span className="provider-option-detail">Claude Sonnet 4, Opus 4, Haiku...</span>
                 </div>
                 {provider === 'anthropic' && <div className="provider-check">✓</div>}
+              </div>
+              <div
+                className={`provider-option ${provider === 'gemini' ? 'selected' : ''}`}
+                onClick={() => handleProviderChange('gemini')}
+              >
+                <div className="provider-option-badge">GRATUIT</div>
+                <div className="provider-option-icon">✨</div>
+                <div className="provider-option-info">
+                  <strong>Google Gemini</strong>
+                  <span>API cloud gratuite (avec limites)</span>
+                  <span className="provider-option-detail">Gemini 2.0 Flash, 1.5 Pro...</span>
+                </div>
+                {provider === 'gemini' && <div className="provider-check">✓</div>}
               </div>
             </div>
           </div>
@@ -204,6 +231,44 @@ export default function AISettings() {
                   className="form-input"
                 />
                 <span className="form-help">Par défaut : http://localhost:11434</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Gemini API Key */}
+        {provider === 'gemini' && (
+          <div className="card settings-card">
+            <div className="card-header">
+              <h3>🔑 Clé API Google Gemini</h3>
+            </div>
+            <div className="card-body">
+              {config?.hasGeminiKey ? (
+                <div className="settings-current-key">
+                  <span className="badge badge-success">✓ Configurée</span>
+                  <span className="settings-key-preview">{config.geminiKeyPreview}</span>
+                </div>
+              ) : (
+                <div className="settings-no-key">
+                  <span className="badge badge-warning">Non configurée</span>
+                  <p>Obtenez votre clé gratuite sur <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a></p>
+                </div>
+              )}
+              <div className="form-group">
+                <label>{config?.hasGeminiKey ? 'Remplacer la clé' : 'Entrez votre clé API'}</label>
+                <div className="input-with-toggle">
+                  <input
+                    type={showGeminiKey ? 'text' : 'password'}
+                    value={geminiApiKey}
+                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                    placeholder="AIza..."
+                    className="form-input"
+                  />
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShowGeminiKey(!showGeminiKey)}>
+                    {showGeminiKey ? '🙈' : '👁️'}
+                  </button>
+                </div>
+                <span className="form-help">Gratuit jusqu'à 15 req/min. Stockée dans ~/.bmad/ai-config.json</span>
               </div>
             </div>
           </div>
