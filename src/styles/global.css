@@ -1346,3 +1346,184 @@ tbody tr:last-child td {
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(59, 130, 246, 0.15));
   border: 1px solid rgba(124, 58, 237, 0.3);
 }
+
+/* ─── Provider Selection ───────────────────────────────────────────────── */
+
+.provider-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.provider-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 16px;
+  background: var(--bg-input);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.provider-option:hover {
+  border-color: var(--accent-purple);
+  background: var(--bg-card-hover);
+}
+
+.provider-option.selected {
+  border-color: var(--accent-purple);
+  background: rgba(124, 58, 237, 0.08);
+  box-shadow: 0 0 0 1px var(--accent-purple);
+}
+
+.provider-option-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--accent-green);
+  color: white;
+}
+
+.provider-option-badge.paid {
+  background: var(--accent-orange);
+}
+
+.provider-option-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.provider-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.provider-option-info strong {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.provider-option-info span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.provider-option-detail {
+  font-size: 11px !important;
+  color: var(--text-muted) !important;
+}
+
+.provider-check {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 16px;
+  color: var(--accent-purple);
+  font-weight: bold;
+}
+
+/* Ollama status */
+.ollama-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ollama-help {
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin: 12px 0;
+}
+
+.ollama-help p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.ollama-help ol {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+.ollama-help a {
+  color: var(--accent-purple-light);
+  text-decoration: underline;
+}
+
+.ollama-help code {
+  background: var(--bg-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--accent-cyan);
+}
+
+.ollama-installed {
+  margin-top: 12px;
+}
+
+.ollama-installed-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+
+.ollama-model-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ollama-model-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--accent-green-light);
+}
+
+.ollama-model-tag small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.model-installed-badge {
+  color: var(--accent-green);
+  font-size: 12px;
+}
+
+.model-not-installed-badge {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.model-option.not-installed {
+  opacity: 0.6;
+}
+
+.badge-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-red-light);
+}

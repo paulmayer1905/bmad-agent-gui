@@ -415,6 +415,10 @@ class BMADBackend {
     return this._aiService.isConfigured();
   }
 
+  async getOllamaStatus() {
+    return await this._aiService.getOllamaStatus();
+  }
+
   // ─── System ─────────────────────────────────────────────────────────────
   async getSystemInfo() {
     return {

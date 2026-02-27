@@ -149,7 +149,7 @@ const api = {
   ai: {
     getConfig: async () => {
       if (isElectron) return window.bmadAPI.ai.getConfig();
-      return { hasApiKey: false, model: 'claude-sonnet-4-20250514', maxTokens: 4096 };
+      return { provider: 'ollama', hasApiKey: false, model: 'llama3.1', maxTokens: 4096, ollamaUrl: 'http://localhost:11434' };
     },
     updateConfig: async (config) => {
       if (isElectron) return window.bmadAPI.ai.updateConfig(config);
@@ -158,6 +158,10 @@ const api = {
     isConfigured: async () => {
       if (isElectron) return window.bmadAPI.ai.isConfigured();
       return false;
+    },
+    ollamaStatus: async () => {
+      if (isElectron) return window.bmadAPI.ai.ollamaStatus();
+      return { available: false, models: [], url: 'http://localhost:11434' };
     },
   },
 };

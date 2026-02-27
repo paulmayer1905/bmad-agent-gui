@@ -147,6 +147,7 @@ function registerIpcHandlers() {
   ipcMain.handle('ai:config:get', () => backend.getAIConfig());
   ipcMain.handle('ai:config:update', (_, config) => backend.updateAIConfig(config));
   ipcMain.handle('ai:configured', () => backend.isAIConfigured());
+  ipcMain.handle('ollama:status', () => backend.getOllamaStatus());
 
   // Streaming chat (uses IPC events instead of invoke)
   ipcMain.on('chat:stream', async (event, sessionId, message) => {

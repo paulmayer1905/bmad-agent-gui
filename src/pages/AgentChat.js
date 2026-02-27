@@ -104,6 +104,8 @@ export default function AgentChat() {
     } catch (err) {
       if (err.message?.includes('API_KEY_MISSING')) {
         setError('Clé API non configurée. Allez dans Paramètres IA pour ajouter votre clé Anthropic.');
+      } else if (err.message?.includes('OLLAMA_CONNECTION_ERROR')) {
+        setError('Impossible de se connecter à Ollama. Vérifiez qu\'Ollama est lancé (ollama serve).');
       } else {
         setError(err.message || 'Erreur lors du démarrage du chat');
       }

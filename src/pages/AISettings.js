@@ -2,45 +2,87 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
-const AVAILABLE_MODELS = [
+const ANTHROPIC_MODELS = [
   { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', description: 'Meilleur rapport qualité/prix' },
   { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', description: 'Le plus capable, plus lent' },
   { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', description: 'Rapide et économique' },
   { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', description: 'Bonne performance générale' },
 ];
 
+const OLLAMA_SUGGESTED = [
+  { id: 'llama3.1', name: 'Llama 3.1 8B', description: 'Très bon généraliste, rapide' },
+  { id: 'llama3.1:70b', name: 'Llama 3.1 70B', description: 'Excellent, nécessite 40+ GB RAM' },
+  { id: 'mistral', name: 'Mistral 7B', description: 'Rapide et compétent' },
+  { id: 'qwen2.5:14b', name: 'Qwen 2.5 14B', description: 'Très bon en code' },
+  { id: 'gemma2', name: 'Gemma 2 9B', description: 'Par Google, bon généraliste' },
+  { id: 'deepseek-coder-v2', name: 'DeepSeek Coder V2', description: 'Excellent pour le code' },
+];
+
 export default function AISettings() {
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
+  const [provider, setProvider] = useState('ollama');
   const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('claude-sonnet-4-20250514');
+  const [model, setModel] = useState('llama3.1');
   const [maxTokens, setMaxTokens] = useState(4096);
+  const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
+  const [ollamaStatus, setOllamaStatus] = useState(null);
+  const [ollamaModels, setOllamaModels] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
   const [showKey, setShowKey] = useState(false);
+  const [checkingOllama, setCheckingOllama] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       const cfg = await api.ai.getConfig();
       setConfig(cfg);
-      setModel(cfg.model || 'claude-sonnet-4-20250514');
+      setProvider(cfg.provider || 'ollama');
+      setModel(cfg.model || (cfg.provider === 'anthropic' ? 'claude-sonnet-4-20250514' : 'llama3.1'));
       setMaxTokens(cfg.maxTokens || 4096);
+      setOllamaUrl(cfg.ollamaUrl || 'http://localhost:11434');
     };
     load();
   }, []);
+
+  // Check Ollama status on load and when provider changes
+  useEffect(() => {
+    if (provider === 'ollama') {
+      checkOllama();
+    }
+  }, [provider]);
+
+  const checkOllama = async () => {
+    setCheckingOllama(true);
+    try {
+      const status = await api.ai.ollamaStatus();
+      setOllamaStatus(status.available);
+      setOllamaModels(status.models || []);
+    } catch {
+      setOllamaStatus(false);
+      setOllamaModels([]);
+    }
+    setCheckingOllama(false);
+  };
+
+  const handleProviderChange = (p) => {
+    setProvider(p);
+    if (p === 'ollama') {
+      setModel('llama3.1');
+    } else {
+      setModel('claude-sonnet-4-20250514');
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      const updates = { model, maxTokens };
-      if (apiKey) {
-        updates.apiKey = apiKey;
-      }
+      const updates = { provider, model, maxTokens, ollamaUrl };
+      if (apiKey) updates.apiKey = apiKey;
       await api.ai.updateConfig(updates);
-      // Refresh config
       const cfg = await api.ai.getConfig();
       setConfig(cfg);
       setApiKey('');
@@ -53,53 +95,157 @@ export default function AISettings() {
     }
   };
 
+  const availableModels = provider === 'ollama'
+    ? (ollamaModels.length > 0 ? ollamaModels : OLLAMA_SUGGESTED)
+    : ANTHROPIC_MODELS;
+
+  const isOllamaModelInstalled = (modelId) => {
+    return ollamaModels.some(m => m.id === modelId || m.id.startsWith(modelId + ':'));
+  };
+
   return (
     <div className="page-container">
       <div className="page-header">
         <h2>🤖 Paramètres IA</h2>
-        <p className="page-subtitle">Configuration de l'API Anthropic pour le chat avec les agents</p>
+        <p className="page-subtitle">Configuration du fournisseur IA pour le chat avec les agents</p>
       </div>
 
       <div className="settings-grid">
-        {/* API Key Section */}
+        {/* Provider Selection */}
         <div className="card settings-card">
           <div className="card-header">
-            <h3>🔑 Clé API Anthropic</h3>
+            <h3>🔌 Fournisseur</h3>
           </div>
           <div className="card-body">
-            {config?.hasApiKey ? (
-              <div className="settings-current-key">
-                <span className="badge badge-success">✓ Configurée</span>
-                <span className="settings-key-preview">{config.apiKeyPreview}</span>
+            <div className="provider-grid">
+              <div
+                className={`provider-option ${provider === 'ollama' ? 'selected' : ''}`}
+                onClick={() => handleProviderChange('ollama')}
+              >
+                <div className="provider-option-badge">GRATUIT</div>
+                <div className="provider-option-icon">🦙</div>
+                <div className="provider-option-info">
+                  <strong>Ollama (Local)</strong>
+                  <span>Modèles open-source sur votre machine</span>
+                  <span className="provider-option-detail">Llama 3, Mistral, Qwen, Gemma...</span>
+                </div>
+                {provider === 'ollama' && <div className="provider-check">✓</div>}
               </div>
-            ) : (
-              <div className="settings-no-key">
-                <span className="badge badge-warning">Non configurée</span>
-                <p>Obtenez votre clé sur <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">console.anthropic.com</a></p>
+              <div
+                className={`provider-option ${provider === 'anthropic' ? 'selected' : ''}`}
+                onClick={() => handleProviderChange('anthropic')}
+              >
+                <div className="provider-option-badge paid">PAYANT</div>
+                <div className="provider-option-icon">🧠</div>
+                <div className="provider-option-info">
+                  <strong>Anthropic Claude</strong>
+                  <span>API cloud, très haute qualité</span>
+                  <span className="provider-option-detail">Claude Sonnet 4, Opus 4, Haiku...</span>
+                </div>
+                {provider === 'anthropic' && <div className="provider-check">✓</div>}
               </div>
-            )}
-            
-            <div className="form-group">
-              <label>{config?.hasApiKey ? 'Remplacer la clé' : 'Entrez votre clé API'}</label>
-              <div className="input-with-toggle">
-                <input
-                  type={showKey ? 'text' : 'password'}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="sk-ant-api..."
-                  className="form-input"
-                />
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setShowKey(!showKey)}
-                >
-                  {showKey ? '🙈' : '👁️'}
-                </button>
-              </div>
-              <span className="form-help">La clé est stockée localement dans ~/.bmad/ai-config.json</span>
             </div>
           </div>
         </div>
+
+        {/* Ollama Status */}
+        {provider === 'ollama' && (
+          <div className="card settings-card">
+            <div className="card-header">
+              <h3>🦙 Ollama</h3>
+            </div>
+            <div className="card-body">
+              <div className="ollama-status-row">
+                <span>Statut :</span>
+                {checkingOllama ? (
+                  <span className="badge">⏳ Vérification...</span>
+                ) : ollamaStatus ? (
+                  <span className="badge badge-success">✓ Connecté</span>
+                ) : (
+                  <span className="badge badge-error">✗ Non disponible</span>
+                )}
+                <button className="btn btn-ghost btn-sm" onClick={checkOllama} disabled={checkingOllama}>
+                  🔄 Tester
+                </button>
+              </div>
+
+              {!ollamaStatus && !checkingOllama && (
+                <div className="ollama-help">
+                  <p><strong>Ollama n'est pas détecté.</strong> Pour l'installer :</p>
+                  <ol>
+                    <li>Téléchargez sur <a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">ollama.com/download</a></li>
+                    <li>Installez et lancez Ollama</li>
+                    <li>Ouvrez un terminal et exécutez : <code>ollama pull llama3.1</code></li>
+                    <li>Revenez ici et cliquez "Tester"</li>
+                  </ol>
+                </div>
+              )}
+
+              {ollamaStatus && ollamaModels.length > 0 && (
+                <div className="ollama-installed">
+                  <p className="ollama-installed-label">Modèles installés ({ollamaModels.length}) :</p>
+                  <div className="ollama-model-tags">
+                    {ollamaModels.map(m => (
+                      <span key={m.id} className="ollama-model-tag">
+                        {m.name} {m.size && <small>({m.size})</small>}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="form-group" style={{marginTop: 12}}>
+                <label>URL Ollama</label>
+                <input
+                  type="text"
+                  value={ollamaUrl}
+                  onChange={(e) => setOllamaUrl(e.target.value)}
+                  placeholder="http://localhost:11434"
+                  className="form-input"
+                />
+                <span className="form-help">Par défaut : http://localhost:11434</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Anthropic API Key */}
+        {provider === 'anthropic' && (
+          <div className="card settings-card">
+            <div className="card-header">
+              <h3>🔑 Clé API Anthropic</h3>
+            </div>
+            <div className="card-body">
+              {config?.hasApiKey ? (
+                <div className="settings-current-key">
+                  <span className="badge badge-success">✓ Configurée</span>
+                  <span className="settings-key-preview">{config.apiKeyPreview}</span>
+                </div>
+              ) : (
+                <div className="settings-no-key">
+                  <span className="badge badge-warning">Non configurée</span>
+                  <p>Obtenez votre clé sur <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">console.anthropic.com</a></p>
+                </div>
+              )}
+              <div className="form-group">
+                <label>{config?.hasApiKey ? 'Remplacer la clé' : 'Entrez votre clé API'}</label>
+                <div className="input-with-toggle">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk-ant-api..."
+                    className="form-input"
+                  />
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShowKey(!showKey)}>
+                    {showKey ? '🙈' : '👁️'}
+                  </button>
+                </div>
+                <span className="form-help">Stockée localement dans ~/.bmad/ai-config.json</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Model Selection */}
         <div className="card settings-card">
@@ -108,22 +254,36 @@ export default function AISettings() {
           </div>
           <div className="card-body">
             <div className="model-grid">
-              {AVAILABLE_MODELS.map(m => (
-                <div
-                  key={m.id}
-                  className={`model-option ${model === m.id ? 'selected' : ''}`}
-                  onClick={() => setModel(m.id)}
-                >
-                  <div className="model-option-radio">
-                    {model === m.id ? '◉' : '○'}
+              {availableModels.map(m => {
+                const installed = provider === 'ollama' && ollamaModels.length > 0
+                  ? isOllamaModelInstalled(m.id)
+                  : true;
+                return (
+                  <div
+                    key={m.id}
+                    className={`model-option ${model === m.id ? 'selected' : ''} ${!installed ? 'not-installed' : ''}`}
+                    onClick={() => setModel(m.id)}
+                  >
+                    <div className="model-option-radio">
+                      {model === m.id ? '◉' : '○'}
+                    </div>
+                    <div className="model-option-info">
+                      <strong>
+                        {m.name}
+                        {provider === 'ollama' && installed && <span className="model-installed-badge"> ✓</span>}
+                        {provider === 'ollama' && !installed && ollamaModels.length > 0 && <span className="model-not-installed-badge"> (non installé)</span>}
+                      </strong>
+                      <span>{m.description || (m.size ? `Taille : ${m.size}` : '')}</span>
+                    </div>
                   </div>
-                  <div className="model-option-info">
-                    <strong>{m.name}</strong>
-                    <span>{m.description}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
+            {provider === 'ollama' && (
+              <div className="form-help" style={{marginTop: 12}}>
+                Pour installer un modèle : <code>ollama pull nom-du-modele</code>
+              </div>
+            )}
           </div>
         </div>
 
@@ -144,7 +304,7 @@ export default function AISettings() {
                 step={256}
                 className="form-input"
               />
-              <span className="form-help">Entre 256 et 8192. Plus élevé = réponses plus longues mais plus coûteuses.</span>
+              <span className="form-help">Entre 256 et 8192.</span>
             </div>
           </div>
         </div>
@@ -161,14 +321,12 @@ export default function AISettings() {
         >
           {saving ? '⏳ Sauvegarde...' : '💾 Sauvegarder'}
         </button>
-        {config?.hasApiKey && (
-          <button
-            className="btn btn-secondary btn-lg"
-            onClick={() => navigate('/chat')}
-          >
-            💬 Aller au Chat
-          </button>
-        )}
+        <button
+          className="btn btn-secondary btn-lg"
+          onClick={() => navigate('/chat')}
+        >
+          💬 Aller au Chat
+        </button>
       </div>
     </div>
   );

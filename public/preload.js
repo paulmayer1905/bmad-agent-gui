@@ -84,6 +84,7 @@ contextBridge.exposeInMainWorld('bmadAPI', {
     getConfig: () => ipcRenderer.invoke('ai:config:get'),
     updateConfig: (config) => ipcRenderer.invoke('ai:config:update', config),
     isConfigured: () => ipcRenderer.invoke('ai:configured'),
+    ollamaStatus: () => ipcRenderer.invoke('ollama:status'),
   },
 
   // Navigation events from menu

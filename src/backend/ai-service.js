@@ -1,34 +1,278 @@
 /**
- * AI Service - Anthropic Claude API integration
+ * AI Service - Multi-provider LLM integration (Ollama + Anthropic)
  * Handles LLM interactions for BMAD agent chat
  */
 
-const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs').promises;
 const path = require('path');
+const http = require('http');
+const https = require('https');
 
+// ─── Provider: Ollama (free, local) ───────────────────────────────────────
+class OllamaProvider {
+  constructor(config = {}) {
+    this.baseUrl = config.ollamaUrl || 'http://localhost:11434';
+    this.model = config.model || 'llama3.1';
+  }
+
+  async chat(messages, systemPrompt, maxTokens) {
+    const body = JSON.stringify({
+      model: this.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages
+      ],
+      stream: false,
+      options: {
+        num_predict: maxTokens || 4096
+      }
+    });
+
+    const response = await this._fetch('/api/chat', body);
+    return {
+      content: response.message?.content || '',
+      usage: {
+        input_tokens: response.prompt_eval_count || 0,
+        output_tokens: response.eval_count || 0
+      },
+      model: response.model || this.model,
+      stopReason: response.done_reason || 'stop'
+    };
+  }
+
+  async streamChat(messages, systemPrompt, maxTokens, onChunk) {
+    const body = JSON.stringify({
+      model: this.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages
+      ],
+      stream: true,
+      options: {
+        num_predict: maxTokens || 4096
+      }
+    });
+
+    return new Promise((resolve, reject) => {
+      const url = new URL('/api/chat', this.baseUrl);
+      const reqModule = url.protocol === 'https:' ? https : http;
+
+      const req = reqModule.request(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }, (res) => {
+        let fullText = '';
+        let lastResponse = null;
+        let buffer = '';
+
+        res.on('data', (chunk) => {
+          buffer += chunk.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // Keep incomplete line
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const json = JSON.parse(line);
+              lastResponse = json;
+              if (json.message?.content) {
+                fullText += json.message.content;
+                if (onChunk) onChunk({ type: 'text', text: json.message.content });
+              }
+            } catch { /* skip malformed */ }
+          }
+        });
+
+        res.on('end', () => {
+          if (buffer.trim()) {
+            try {
+              const json = JSON.parse(buffer);
+              lastResponse = json;
+              if (json.message?.content) {
+                fullText += json.message.content;
+                if (onChunk) onChunk({ type: 'text', text: json.message.content });
+              }
+            } catch { /* skip */ }
+          }
+          resolve({
+            content: fullText,
+            usage: {
+              input_tokens: lastResponse?.prompt_eval_count || 0,
+              output_tokens: lastResponse?.eval_count || 0
+            },
+            model: lastResponse?.model || this.model,
+            stopReason: lastResponse?.done_reason || 'stop'
+          });
+        });
+
+        res.on('error', reject);
+      });
+
+      req.on('error', (err) => {
+        reject(new Error(`OLLAMA_CONNECTION_ERROR: ${err.message}. Est-ce qu'Ollama est lancé ?`));
+      });
+
+      req.write(body);
+      req.end();
+    });
+  }
+
+  async listModels() {
+    try {
+      const response = await this._fetch('/api/tags', null, 'GET');
+      return (response.models || []).map(m => ({
+        id: m.name,
+        name: m.name,
+        size: m.size ? `${(m.size / 1e9).toFixed(1)} GB` : null,
+        modified: m.modified_at
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async isAvailable() {
+    try {
+      await this._fetch('/api/tags', null, 'GET');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  _fetch(endpoint, body, method = 'POST') {
+    return new Promise((resolve, reject) => {
+      const url = new URL(endpoint, this.baseUrl);
+      const reqModule = url.protocol === 'https:' ? https : http;
+
+      const req = reqModule.request(url, {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        timeout: 5000
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try { resolve(JSON.parse(data)); }
+          catch { reject(new Error('Invalid JSON response from Ollama')); }
+        });
+      });
+
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('Ollama connection timeout')); });
+      if (body) req.write(body);
+      req.end();
+    });
+  }
+}
+
+// ─── Provider: Anthropic Claude (paid) ────────────────────────────────────
+class AnthropicProvider {
+  constructor(config = {}) {
+    this.apiKey = config.apiKey;
+    this.model = config.model || 'claude-sonnet-4-20250514';
+    this.client = null;
+    if (this.apiKey) this._initClient();
+  }
+
+  _initClient() {
+    try {
+      const Anthropic = require('@anthropic-ai/sdk');
+      this.client = new Anthropic({ apiKey: this.apiKey });
+    } catch (err) {
+      console.warn('Anthropic SDK not available:', err.message);
+    }
+  }
+
+  async chat(messages, systemPrompt, maxTokens) {
+    if (!this.client) throw new Error('API_KEY_MISSING');
+
+    const response = await this.client.messages.create({
+      model: this.model,
+      max_tokens: maxTokens || 4096,
+      system: systemPrompt,
+      messages: messages,
+    });
+
+    const content = response.content
+      .filter(block => block.type === 'text')
+      .map(block => block.text)
+      .join('\n');
+
+    return {
+      content,
+      usage: response.usage,
+      model: response.model,
+      stopReason: response.stop_reason
+    };
+  }
+
+  async streamChat(messages, systemPrompt, maxTokens, onChunk) {
+    if (!this.client) throw new Error('API_KEY_MISSING');
+
+    const stream = this.client.messages.stream({
+      model: this.model,
+      max_tokens: maxTokens || 4096,
+      system: systemPrompt,
+      messages: messages,
+    });
+
+    let fullText = '';
+    stream.on('text', (text) => {
+      fullText += text;
+      if (onChunk) onChunk({ type: 'text', text });
+    });
+
+    const finalMessage = await stream.finalMessage();
+
+    return {
+      content: fullText,
+      usage: finalMessage.usage,
+      model: finalMessage.model,
+      stopReason: finalMessage.stop_reason
+    };
+  }
+
+  async isAvailable() {
+    return !!this.client;
+  }
+}
+
+// ─── AI Service (orchestrates providers) ──────────────────────────────────
 class AIService {
   constructor(options = {}) {
     this.configPath = options.configPath || path.join(
       process.env.HOME || process.env.USERPROFILE, '.bmad', 'ai-config.json'
     );
-    this.client = null;
-    this.model = 'claude-sonnet-4-20250514';
+    this.provider = null;
+    this.providerName = 'ollama';
+    this.model = 'llama3.1';
     this.maxTokens = 4096;
-    this.conversations = new Map(); // sessionId -> messages[]
+    this.ollamaUrl = 'http://localhost:11434';
+    this.conversations = new Map();
   }
 
   async initialize() {
     const config = await this.loadConfig();
-    if (config.apiKey) {
-      this._createClient(config.apiKey);
-    }
-    if (config.model) this.model = config.model;
-    if (config.maxTokens) this.maxTokens = config.maxTokens;
+    this.providerName = config.provider || 'ollama';
+    this.model = config.model || (this.providerName === 'ollama' ? 'llama3.1' : 'claude-sonnet-4-20250514');
+    this.maxTokens = config.maxTokens || 4096;
+    this.ollamaUrl = config.ollamaUrl || 'http://localhost:11434';
+    this._initProvider(config);
   }
 
-  _createClient(apiKey) {
-    this.client = new Anthropic({ apiKey });
+  _initProvider(config = {}) {
+    if (this.providerName === 'anthropic') {
+      this.provider = new AnthropicProvider({
+        apiKey: config.apiKey,
+        model: this.model
+      });
+    } else {
+      this.provider = new OllamaProvider({
+        ollamaUrl: this.ollamaUrl,
+        model: this.model
+      });
+    }
   }
 
   async loadConfig() {
@@ -43,32 +287,39 @@ class AIService {
   async saveConfig(config) {
     const dir = path.dirname(this.configPath);
     await fs.mkdir(dir, { recursive: true });
-    // Merge with existing
     const existing = await this.loadConfig();
     const merged = { ...existing, ...config };
     await fs.writeFile(this.configPath, JSON.stringify(merged, null, 2));
-    // Reinitialize if API key changed
-    if (config.apiKey) {
-      this._createClient(config.apiKey);
-    }
+    if (config.provider) this.providerName = config.provider;
     if (config.model) this.model = config.model;
     if (config.maxTokens) this.maxTokens = config.maxTokens;
+    if (config.ollamaUrl) this.ollamaUrl = config.ollamaUrl;
+    this._initProvider(merged);
     return merged;
   }
 
   async getConfig() {
     const config = await this.loadConfig();
     return {
+      provider: config.provider || 'ollama',
       hasApiKey: !!config.apiKey,
       apiKeyPreview: config.apiKey ? `${config.apiKey.slice(0, 10)}...${config.apiKey.slice(-4)}` : null,
       model: config.model || this.model,
       maxTokens: config.maxTokens || this.maxTokens,
+      ollamaUrl: config.ollamaUrl || 'http://localhost:11434',
     };
   }
 
-  /**
-   * Build system prompt from a BMAD agent definition (.md file content)
-   */
+  async getOllamaStatus() {
+    const ollama = new OllamaProvider({ ollamaUrl: this.ollamaUrl });
+    const available = await ollama.isAvailable();
+    let models = [];
+    if (available) {
+      models = await ollama.listModels();
+    }
+    return { available, models, url: this.ollamaUrl };
+  }
+
   buildSystemPrompt(agentDefinition, agentName) {
     return `You are operating as a BMAD-METHOD agent. Your complete agent definition follows below.
 Read it carefully and adopt the persona, role, and behavior described.
@@ -88,9 +339,6 @@ ${agentDefinition}
 You are now ${agentName}. Greet the user briefly and await their instructions.`;
   }
 
-  /**
-   * Start a new chat session with an agent
-   */
   async startChat(sessionId, agentDefinition, agentName) {
     const systemPrompt = this.buildSystemPrompt(agentDefinition, agentName);
     this.conversations.set(sessionId, {
@@ -99,98 +347,49 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
       messages: [],
       createdAt: Date.now()
     });
-    // Get initial greeting
     return await this.sendMessage(sessionId, null);
   }
 
-  /**
-   * Send a message in an existing chat session
-   * If userMessage is null, just get the agent's initial greeting
-   */
   async sendMessage(sessionId, userMessage) {
-    if (!this.client) {
-      throw new Error('API_KEY_MISSING');
-    }
+    if (!this.provider) throw new Error('PROVIDER_NOT_CONFIGURED');
 
     const conversation = this.conversations.get(sessionId);
-    if (!conversation) {
-      throw new Error('SESSION_NOT_FOUND');
-    }
+    if (!conversation) throw new Error('SESSION_NOT_FOUND');
 
-    // Add user message to history
     if (userMessage) {
-      conversation.messages.push({
-        role: 'user',
-        content: userMessage
-      });
+      conversation.messages.push({ role: 'user', content: userMessage });
     }
 
-    // If no messages yet (initial greeting), add a starter
     const messages = conversation.messages.length > 0
       ? conversation.messages
       : [{ role: 'user', content: 'Hello, please introduce yourself and tell me how you can help.' }];
 
     try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: this.maxTokens,
-        system: conversation.systemPrompt,
-        messages: messages,
-      });
+      const result = await this.provider.chat(messages, conversation.systemPrompt, this.maxTokens);
 
-      const assistantMessage = response.content
-        .filter(block => block.type === 'text')
-        .map(block => block.text)
-        .join('\n');
-
-      // If this was the initial greeting with our injected message, replace
       if (conversation.messages.length === 0) {
         conversation.messages.push(
           { role: 'user', content: 'Hello, please introduce yourself and tell me how you can help.' },
-          { role: 'assistant', content: assistantMessage }
+          { role: 'assistant', content: result.content }
         );
       } else {
-        conversation.messages.push({
-          role: 'assistant',
-          content: assistantMessage
-        });
+        conversation.messages.push({ role: 'assistant', content: result.content });
       }
 
-      return {
-        content: assistantMessage,
-        usage: response.usage,
-        model: response.model,
-        stopReason: response.stop_reason
-      };
+      return result;
     } catch (error) {
-      if (error.status === 401) {
-        throw new Error('INVALID_API_KEY');
-      }
-      if (error.status === 429) {
-        throw new Error('RATE_LIMITED');
-      }
-      throw new Error(`API_ERROR: ${error.message}`);
+      this._handleError(error);
     }
   }
 
-  /**
-   * Stream a message response (for real-time token display)
-   */
   async streamMessage(sessionId, userMessage, onChunk) {
-    if (!this.client) {
-      throw new Error('API_KEY_MISSING');
-    }
+    if (!this.provider) throw new Error('PROVIDER_NOT_CONFIGURED');
 
     const conversation = this.conversations.get(sessionId);
-    if (!conversation) {
-      throw new Error('SESSION_NOT_FOUND');
-    }
+    if (!conversation) throw new Error('SESSION_NOT_FOUND');
 
     if (userMessage) {
-      conversation.messages.push({
-        role: 'user',
-        content: userMessage
-      });
+      conversation.messages.push({ role: 'user', content: userMessage });
     }
 
     const messages = conversation.messages.length > 0
@@ -198,51 +397,31 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
       : [{ role: 'user', content: 'Hello, please introduce yourself and tell me how you can help.' }];
 
     try {
-      const stream = this.client.messages.stream({
-        model: this.model,
-        max_tokens: this.maxTokens,
-        system: conversation.systemPrompt,
-        messages: messages,
-      });
+      const result = await this.provider.streamChat(messages, conversation.systemPrompt, this.maxTokens, onChunk);
 
-      let fullText = '';
-
-      stream.on('text', (text) => {
-        fullText += text;
-        if (onChunk) onChunk({ type: 'text', text });
-      });
-
-      const finalMessage = await stream.finalMessage();
-
-      // Store in history
       if (conversation.messages.length === 0) {
         conversation.messages.push(
           { role: 'user', content: 'Hello, please introduce yourself and tell me how you can help.' },
-          { role: 'assistant', content: fullText }
+          { role: 'assistant', content: result.content }
         );
       } else {
-        conversation.messages.push({
-          role: 'assistant',
-          content: fullText
-        });
+        conversation.messages.push({ role: 'assistant', content: result.content });
       }
 
-      return {
-        content: fullText,
-        usage: finalMessage.usage,
-        model: finalMessage.model,
-        stopReason: finalMessage.stop_reason
-      };
+      return result;
     } catch (error) {
-      if (error.status === 401) throw new Error('INVALID_API_KEY');
-      if (error.status === 429) throw new Error('RATE_LIMITED');
-      throw new Error(`API_ERROR: ${error.message}`);
+      this._handleError(error);
     }
   }
 
-  /**
-   * Get conversation history for a session
-   */
+  _handleError(error) {
+    if (error.message?.startsWith('OLLAMA_CONNECTION_ERROR')) throw error;
+    if (error.message?.startsWith('API_KEY_MISSING')) throw error;
+    if (error.status === 401) throw new Error('INVALID_API_KEY');
+    if (error.status === 429) throw new Error('RATE_LIMITED');
+    throw new Error(`API_ERROR: ${error.message}`);
+  }
+
   getHistory(sessionId) {
     const conversation = this.conversations.get(sessionId);
     if (!conversation) return [];
@@ -253,17 +432,11 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
     }));
   }
 
-  /**
-   * Clear a chat session
-   */
   clearChat(sessionId) {
     this.conversations.delete(sessionId);
     return { success: true };
   }
 
-  /**
-   * List active chat sessions
-   */
   listChats() {
     const chats = [];
     for (const [id, conv] of this.conversations) {
@@ -281,7 +454,8 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
   }
 
   isConfigured() {
-    return !!this.client;
+    if (this.providerName === 'ollama') return true;
+    return !!(this.provider && this.provider.client);
   }
 }
 
