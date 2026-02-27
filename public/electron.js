@@ -139,16 +139,29 @@ function registerIpcHandlers() {
   ipcMain.handle('system:info', () => backend.getSystemInfo());
   ipcMain.handle('system:health', () => backend.getHealthCheck());
 
+  // Helper: wrap IPC handlers to serialize errors properly across IPC
+  const safeHandle = (channel, fn) => {
+    ipcMain.handle(channel, async (...args) => {
+      try {
+        return await fn(...args);
+      } catch (err) {
+        // Re-throw with guaranteed message (Node.js v22 AggregateError has empty message)
+        const msg = err.message || err.code || String(err) || 'Unknown error';
+        throw new Error(msg);
+      }
+    });
+  };
+
   // Chat / AI
-  ipcMain.handle('chat:start', (_, agentName) => backend.startChat(agentName));
-  ipcMain.handle('chat:send', (_, sessionId, message) => backend.sendChatMessage(sessionId, message));
-  ipcMain.handle('chat:history', (_, sessionId) => backend.getChatHistory(sessionId));
-  ipcMain.handle('chat:clear', (_, sessionId) => backend.clearChat(sessionId));
-  ipcMain.handle('chat:list', () => backend.listChats());
-  ipcMain.handle('ai:config:get', () => backend.getAIConfig());
-  ipcMain.handle('ai:config:update', (_, config) => backend.updateAIConfig(config));
-  ipcMain.handle('ai:configured', () => backend.isAIConfigured());
-  ipcMain.handle('ollama:status', () => backend.getOllamaStatus());
+  safeHandle('chat:start', (_, agentName) => backend.startChat(agentName));
+  safeHandle('chat:send', (_, sessionId, message) => backend.sendChatMessage(sessionId, message));
+  safeHandle('chat:history', (_, sessionId) => backend.getChatHistory(sessionId));
+  safeHandle('chat:clear', (_, sessionId) => backend.clearChat(sessionId));
+  safeHandle('chat:list', () => backend.listChats());
+  safeHandle('ai:config:get', () => backend.getAIConfig());
+  safeHandle('ai:config:update', (_, config) => backend.updateAIConfig(config));
+  safeHandle('ai:configured', () => backend.isAIConfigured());
+  safeHandle('ollama:status', () => backend.getOllamaStatus());
 
   // Streaming chat (uses IPC events instead of invoke)
   ipcMain.on('chat:stream', async (event, sessionId, message) => {

@@ -19,22 +19,57 @@ export default function AgentChat() {
   const [activeChats, setActiveChats] = useState([]);
   const [streamingText, setStreamingText] = useState('');
   const [useStreaming, setUseStreaming] = useState(true);
+  const [providerStatus, setProviderStatus] = useState(null); // { ready, provider, error, models }
   
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // Load agents and check AI config
+  // Load agents and check AI config + provider readiness
   useEffect(() => {
     const load = async () => {
-      const [agentList, configured, chats] = await Promise.all([
+      const [agentList, configured, chats, aiConfig] = await Promise.all([
         api.agents.list(),
         api.ai.isConfigured(),
-        api.chat.list()
+        api.chat.list(),
+        api.ai.getConfig()
       ]);
       setAgents(agentList);
       setAiConfigured(configured);
       setActiveChats(chats);
+
+      // Check provider readiness
+      const currentProvider = aiConfig.provider || 'ollama';
+      if (currentProvider === 'ollama') {
+        try {
+          const ollamaStatus = await api.ai.ollamaStatus();
+          if (ollamaStatus.available) {
+            setProviderStatus({
+              ready: true,
+              provider: 'ollama',
+              models: ollamaStatus.models || []
+            });
+          } else {
+            setProviderStatus({
+              ready: false,
+              provider: 'ollama',
+              error: 'not_running'
+            });
+          }
+        } catch {
+          setProviderStatus({
+            ready: false,
+            provider: 'ollama',
+            error: 'not_running'
+          });
+        }
+      } else if (currentProvider === 'anthropic') {
+        setProviderStatus({
+          ready: configured,
+          provider: 'anthropic',
+          error: configured ? null : 'no_api_key'
+        });
+      }
     };
     load();
   }, []);
@@ -77,12 +112,12 @@ export default function AgentChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingText]);
 
-  // Auto-start if agent specified in URL
+  // Auto-start if agent specified in URL and provider is ready
   useEffect(() => {
-    if (agentName && aiConfigured && !session && !starting) {
+    if (agentName && providerStatus?.ready && !session && !starting) {
       handleStartChat(agentName);
     }
-  }, [agentName, aiConfigured]);
+  }, [agentName, providerStatus]);
 
   const handleStartChat = async (agent) => {
     setStarting(true);
@@ -102,12 +137,13 @@ export default function AgentChat() {
       // Focus input
       setTimeout(() => textareaRef.current?.focus(), 100);
     } catch (err) {
-      if (err.message?.includes('API_KEY_MISSING')) {
+      const errMsg = err.message || String(err) || 'Erreur inconnue';
+      if (errMsg.includes('API_KEY_MISSING')) {
         setError('Clé API non configurée. Allez dans Paramètres IA pour ajouter votre clé Anthropic.');
-      } else if (err.message?.includes('OLLAMA_CONNECTION_ERROR')) {
-        setError('Impossible de se connecter à Ollama. Vérifiez qu\'Ollama est lancé (ollama serve).');
+      } else if (errMsg.includes('OLLAMA_CONNECTION_ERROR') || errMsg.includes('ECONNREFUSED') || errMsg.includes('connexion')) {
+        setError('Impossible de se connecter à Ollama. Lancez \"ollama serve\" dans un terminal, puis réessayez.');
       } else {
-        setError(err.message || 'Erreur lors du démarrage du chat');
+        setError(errMsg);
       }
     } finally {
       setStarting(false);
@@ -185,20 +221,68 @@ export default function AgentChat() {
     setTimeout(() => textareaRef.current?.focus(), 100);
   };
 
-  // ─── Render: API key not configured ─────────────────────────────────
-  if (aiConfigured === false) {
+  // ─── Render: Provider not ready ───────────────────────────────────
+  if (providerStatus && !providerStatus.ready) {
     return (
       <div className="page-container">
         <div className="page-header">
           <h2>💬 Chat avec un Agent</h2>
         </div>
         <div className="chat-setup-card">
-          <div className="chat-setup-icon">🔑</div>
-          <h3>Configuration requise</h3>
-          <p>Pour discuter avec les agents BMAD, vous devez configurer votre clé API Anthropic.</p>
-          <button className="btn btn-primary" onClick={() => navigate('/ai-settings')}>
-            Configurer la clé API
-          </button>
+          {providerStatus.provider === 'ollama' ? (
+            <>
+              <div className="chat-setup-icon">🦙</div>
+              <h3>Ollama n'est pas lancé</h3>
+              <p style={{ marginBottom: 12 }}>
+                Pour discuter avec les agents, Ollama doit être en cours d'exécution sur votre machine.
+              </p>
+              <div style={{ 
+                background: 'var(--bg-card)', 
+                border: '1px solid var(--border)', 
+                borderRadius: 'var(--radius-sm)', 
+                padding: '16px 20px', 
+                marginBottom: 20, 
+                textAlign: 'left',
+                fontSize: 14,
+                lineHeight: 1.8
+              }}>
+                <strong>📋 Étapes à suivre :</strong><br />
+                1. <strong>Installer Ollama</strong> : téléchargez sur <span style={{ color: 'var(--accent-purple-light)' }}>https://ollama.com</span><br />
+                2. <strong>Lancer Ollama</strong> : ouvrez un terminal et tapez <code style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4 }}>ollama serve</code><br />
+                3. <strong>Télécharger un modèle</strong> : <code style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4 }}>ollama pull llama3.1</code><br />
+                4. Revenez ici et cliquez sur <em>Réessayer</em>
+              </div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="btn btn-primary" onClick={() => window.location.reload()}>
+                  🔄 Réessayer
+                </button>
+                <button className="btn btn-secondary" onClick={() => navigate('/ai-settings')}>
+                  ⚙️ Changer de provider
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="chat-setup-icon">🔑</div>
+              <h3>Configuration requise</h3>
+              <p>Pour discuter avec les agents BMAD via Anthropic, configurez votre clé API.</p>
+              <button className="btn btn-primary" onClick={() => navigate('/ai-settings')}>
+                Configurer la clé API
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Render: Loading provider status ────────────────────────────────
+  if (!providerStatus) {
+    return (
+      <div className="page-container">
+        <div className="chat-loading">
+          <div className="chat-loading-spinner"></div>
+          <p>Vérification de la connexion...</p>
         </div>
       </div>
     );

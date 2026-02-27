@@ -109,7 +109,8 @@ class OllamaProvider {
       });
 
       req.on('error', (err) => {
-        reject(new Error(`OLLAMA_CONNECTION_ERROR: ${err.message}. Est-ce qu'Ollama est lancé ?`));
+        const msg = err.message || err.code || 'connexion refusée';
+        reject(new Error(`OLLAMA_CONNECTION_ERROR: ${msg}. Vérifiez qu'Ollama est lancé (ollama serve).`));
       });
 
       req.write(body);
@@ -161,10 +162,11 @@ class OllamaProvider {
       });
 
       req.on('error', (err) => {
-        reject(new Error(`OLLAMA_CONNECTION_ERROR: ${err.message}. Est-ce qu'Ollama est lancé ?`));
+        const msg = err.message || err.code || 'connexion refusée';
+        reject(new Error(`OLLAMA_CONNECTION_ERROR: ${msg}. Vérifiez qu'Ollama est lancé (ollama serve).`));
       });
       if (timeout > 0) {
-        req.on('timeout', () => { req.destroy(); reject(new Error('OLLAMA_CONNECTION_ERROR: Timeout de connexion. Est-ce qu\'Ollama est lancé ?')); });
+        req.on('timeout', () => { req.destroy(); reject(new Error('OLLAMA_CONNECTION_ERROR: Timeout de connexion. Vérifiez qu\'Ollama est lancé (ollama serve).')); });
       }
       if (body) req.write(body);
       req.end();
