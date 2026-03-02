@@ -25,6 +25,14 @@ const GEMINI_MODELS = [
   { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Bon équilibre vitesse/qualité' },
 ];
 
+const OPENAI_MODELS = [
+  { id: 'gpt-4o', name: 'GPT-4o', description: 'Le plus capable, multimodal' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'Rapide et économique, très bon rapport qualité/prix' },
+  { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', description: 'Précédente génération, 128K contexte' },
+  { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Le moins cher, rapide' },
+  { id: 'o3-mini', name: 'o3-mini', description: 'Raisonnement avancé, rapide' },
+];
+
 export default function AISettings() {
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
@@ -41,6 +49,8 @@ export default function AISettings() {
   const [showKey, setShowKey] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [openaiApiKey, setOpenaiApiKey] = useState('');
+  const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [checkingOllama, setCheckingOllama] = useState(false);
   const [validatingKey, setValidatingKey] = useState(false);
   const [keyValidation, setKeyValidation] = useState(null); // { valid, error, note }
@@ -84,6 +94,8 @@ export default function AISettings() {
       setModel('llama3.1');
     } else if (p === 'gemini') {
       setModel('gemini-2.0-flash');
+    } else if (p === 'openai') {
+      setModel('gpt-4o-mini');
     } else {
       setModel('claude-sonnet-4-20250514');
     }
@@ -111,11 +123,13 @@ export default function AISettings() {
       const updates = { provider, model, maxTokens, ollamaUrl };
       if (apiKey) updates.apiKey = apiKey;
       if (geminiApiKey) updates.geminiApiKey = geminiApiKey;
+      if (openaiApiKey) updates.openaiApiKey = openaiApiKey;
       await api.ai.updateConfig(updates);
       const cfg = await api.ai.getConfig();
       setConfig(cfg);
       setApiKey('');
       setGeminiApiKey('');
+      setOpenaiApiKey('');
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
@@ -128,6 +142,7 @@ export default function AISettings() {
   const availableModels = provider === 'ollama'
     ? (ollamaModels.length > 0 ? ollamaModels : OLLAMA_SUGGESTED)
     : provider === 'gemini' ? GEMINI_MODELS
+    : provider === 'openai' ? OPENAI_MODELS
     : ANTHROPIC_MODELS;
 
   const isOllamaModelInstalled = (modelId) => {
@@ -187,6 +202,19 @@ export default function AISettings() {
                   <span className="provider-option-detail">Gemini 2.0 Flash, 1.5 Pro...</span>
                 </div>
                 {provider === 'gemini' && <div className="provider-check">✓</div>}
+              </div>
+              <div
+                className={`provider-option ${provider === 'openai' ? 'selected' : ''}`}
+                onClick={() => handleProviderChange('openai')}
+              >
+                <div className="provider-option-badge paid">PAYANT</div>
+                <div className="provider-option-icon">💬</div>
+                <div className="provider-option-info">
+                  <strong>OpenAI ChatGPT</strong>
+                  <span>API cloud, GPT-4o et plus</span>
+                  <span className="provider-option-detail">GPT-4o, GPT-4o Mini, o3-mini...</span>
+                </div>
+                {provider === 'openai' && <div className="provider-check">✓</div>}
               </div>
             </div>
           </div>
@@ -300,6 +328,58 @@ export default function AISettings() {
                   </div>
                 )}
                 <span className="form-help">Gratuit jusqu'à 15 req/min. Stockée dans ~/.bmad/ai-config.json</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* OpenAI API Key */}
+        {provider === 'openai' && (
+          <div className="card settings-card">
+            <div className="card-header">
+              <h3>🔑 Clé API OpenAI</h3>
+            </div>
+            <div className="card-body">
+              {config?.hasOpenaiKey ? (
+                <div className="settings-current-key">
+                  <span className="badge badge-success">✓ Configurée</span>
+                  <span className="settings-key-preview">{config.openaiKeyPreview}</span>
+                </div>
+              ) : (
+                <div className="settings-no-key">
+                  <span className="badge badge-warning">Non configurée</span>
+                  <p>Obtenez votre clé sur <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">platform.openai.com/api-keys</a></p>
+                </div>
+              )}
+              <div className="form-group">
+                <label>{config?.hasOpenaiKey ? 'Remplacer la clé' : 'Entrez votre clé API'}</label>
+                <div className="input-with-toggle">
+                  <input
+                    type={showOpenaiKey ? 'text' : 'password'}
+                    value={openaiApiKey}
+                    onChange={(e) => { setOpenaiApiKey(e.target.value); setKeyValidation(null); }}
+                    placeholder="sk-..."
+                    className="form-input"
+                  />
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShowOpenaiKey(!showOpenaiKey)}>
+                    {showOpenaiKey ? '🙈' : '👁️'}
+                  </button>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => handleValidateKey('openai', openaiApiKey)}
+                    disabled={!openaiApiKey.trim() || validatingKey}
+                    title="Tester la clé"
+                  >
+                    {validatingKey ? '⏳' : '✔ Vérifier'}
+                  </button>
+                </div>
+                {keyValidation && (
+                  <div className={`key-validation-result ${keyValidation.valid ? 'valid' : 'invalid'}`}>
+                    {keyValidation.valid ? '✅ Clé valide !' : `❌ ${keyValidation.error}`}
+                    {keyValidation.note && <span> ({keyValidation.note})</span>}
+                  </div>
+                )}
+                <span className="form-help">Payant à l'usage. Stockée dans ~/.bmad/ai-config.json</span>
               </div>
             </div>
           </div>

@@ -110,6 +110,8 @@ export default function AgentChat() {
         setError('no_api_key');
       } else if (errMsg.includes('OLLAMA_CONNECTION_ERROR') || errMsg.includes('ECONNREFUSED') || errMsg.includes('connexion') || errMsg.includes('fetch failed')) {
         setError('ollama_not_running');
+      } else if (errMsg.includes('OPENAI_ERROR') || errMsg.includes('OPENAI_CONNECTION_ERROR') || errMsg.includes('OPENAI_RATE_LIMITED')) {
+        setError('openai_error:' + errMsg.replace(/OPENAI_(CONNECTION_ERROR|RATE_LIMITED|ERROR):\s*/, ''));
       } else if (errMsg.includes('GEMINI_QUOTA_EXHAUSTED')) {
         setError('gemini_quota:' + errMsg.replace(/GEMINI_QUOTA_EXHAUSTED:\s*/, ''));
       } else if (errMsg.includes('GEMINI_ERROR') || errMsg.includes('GEMINI_CONNECTION_ERROR')) {
@@ -287,6 +289,22 @@ export default function AgentChat() {
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-primary" onClick={handleRetry}>
                   🔄 Réessayer (avec fallback auto)
+                </button>
+                <button className="btn btn-secondary" onClick={() => navigate('/ai-settings')}>
+                  ⚙️ Paramètres IA
+                </button>
+              </div>
+            </>
+          ) : error.startsWith && error.startsWith('openai_error:') ? (
+            <>
+              <div className="chat-setup-icon">💬</div>
+              <h3>Erreur OpenAI</h3>
+              <p style={{ marginBottom: 16, color: 'var(--accent-red)' }}>
+                {error.replace('openai_error:', '')}
+              </p>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="btn btn-primary" onClick={handleRetry}>
+                  🔄 Réessayer
                 </button>
                 <button className="btn btn-secondary" onClick={() => navigate('/ai-settings')}>
                   ⚙️ Paramètres IA

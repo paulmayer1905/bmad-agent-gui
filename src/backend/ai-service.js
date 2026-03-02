@@ -1,5 +1,5 @@
 /**
- * AI Service - Multi-provider LLM integration (Ollama + Anthropic + Gemini)
+ * AI Service - Multi-provider LLM integration (Ollama + Anthropic + Gemini + OpenAI)
  * Handles LLM interactions for BMAD agent chat
  */
 
@@ -171,6 +171,195 @@ class OllamaProvider {
       if (body) req.write(body);
       req.end();
     });
+  }
+}
+
+// ─── Provider: OpenAI / ChatGPT (paid) ───────────────────────────────────
+class OpenAIProvider {
+  constructor(config = {}) {
+    this.apiKey = config.apiKey;
+    this.model = config.model || 'gpt-4o-mini';
+    this.baseUrl = 'https://api.openai.com/v1';
+  }
+
+  async chat(messages, systemPrompt, maxTokens) {
+    if (!this.apiKey) throw new Error('API_KEY_MISSING');
+
+    const body = JSON.stringify({
+      model: this.model,
+      max_tokens: maxTokens || 4096,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages
+      ]
+    });
+
+    const response = await this._fetch('/chat/completions', body);
+
+    if (response.error) {
+      throw new Error(`OPENAI_ERROR: ${response.error.message || JSON.stringify(response.error)}`);
+    }
+
+    const choice = response.choices?.[0];
+    return {
+      content: choice?.message?.content || '',
+      usage: {
+        input_tokens: response.usage?.prompt_tokens || 0,
+        output_tokens: response.usage?.completion_tokens || 0
+      },
+      model: response.model || this.model,
+      stopReason: choice?.finish_reason || 'stop'
+    };
+  }
+
+  async streamChat(messages, systemPrompt, maxTokens, onChunk) {
+    if (!this.apiKey) throw new Error('API_KEY_MISSING');
+
+    const body = JSON.stringify({
+      model: this.model,
+      max_tokens: maxTokens || 4096,
+      stream: true,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages
+      ]
+    });
+
+    return new Promise((resolve, reject) => {
+      const url = new URL(this.baseUrl + '/chat/completions');
+      const req = https.request(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        }
+      }, (res) => {
+        if (res.statusCode === 401) {
+          reject(new Error('OPENAI_ERROR: Clé API invalide'));
+          return;
+        }
+        if (res.statusCode === 429) {
+          let data = '';
+          res.on('data', (chunk) => data += chunk);
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(data);
+              reject(new Error(`OPENAI_RATE_LIMITED: ${json.error?.message || 'Rate limit atteint'}`));
+            } catch {
+              reject(new Error('OPENAI_RATE_LIMITED: Rate limit atteint'));
+            }
+          });
+          return;
+        }
+        if (res.statusCode === 402 || res.statusCode === 403) {
+          let data = '';
+          res.on('data', (chunk) => data += chunk);
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(data);
+              reject(new Error(`OPENAI_ERROR: ${json.error?.message || 'Accès refusé'}`));
+            } catch {
+              reject(new Error('OPENAI_ERROR: Accès refusé (vérifiez votre abonnement OpenAI)'));
+            }
+          });
+          return;
+        }
+
+        let fullText = '';
+        let buffer = '';
+
+        res.on('data', (chunk) => {
+          buffer += chunk.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === '[DONE]') continue;
+            if (!jsonStr) continue;
+            try {
+              const json = JSON.parse(jsonStr);
+              const delta = json.choices?.[0]?.delta?.content || '';
+              if (delta) {
+                fullText += delta;
+                if (onChunk) onChunk({ type: 'text', text: delta });
+              }
+            } catch { /* skip malformed SSE */ }
+          }
+        });
+
+        res.on('end', () => {
+          // Process remaining buffer
+          if (buffer.trim()) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr === '[DONE]' || !jsonStr) continue;
+              try {
+                const json = JSON.parse(jsonStr);
+                const delta = json.choices?.[0]?.delta?.content || '';
+                if (delta) {
+                  fullText += delta;
+                  if (onChunk) onChunk({ type: 'text', text: delta });
+                }
+              } catch { /* skip */ }
+            }
+          }
+          resolve({
+            content: fullText,
+            usage: { input_tokens: 0, output_tokens: 0 },
+            model: this.model,
+            stopReason: 'stop'
+          });
+        });
+
+        res.on('error', reject);
+      });
+
+      req.on('error', (err) => {
+        reject(new Error(`OPENAI_CONNECTION_ERROR: ${err.message || 'connexion échouée'}`));
+      });
+
+      req.write(body);
+      req.end();
+    });
+  }
+
+  _fetch(endpoint, body) {
+    return new Promise((resolve, reject) => {
+      const url = new URL(this.baseUrl + endpoint);
+      const req = https.request(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        }
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(data);
+            json._httpStatus = res.statusCode;
+            resolve(json);
+          }
+          catch { reject(new Error('Invalid JSON from OpenAI API')); }
+        });
+      });
+
+      req.on('error', (err) => {
+        reject(new Error(`OPENAI_CONNECTION_ERROR: ${err.message || 'connexion échouée'}`));
+      });
+
+      req.write(body);
+      req.end();
+    });
+  }
+
+  async isAvailable() {
+    return !!this.apiKey;
   }
 }
 
@@ -635,7 +824,7 @@ class AIService {
   async initialize() {
     const config = await this.loadConfig();
     this.providerName = config.provider || 'ollama';
-    const defaultModels = { ollama: 'llama3.1', anthropic: 'claude-sonnet-4-20250514', gemini: 'gemini-2.0-flash' };
+    const defaultModels = { ollama: 'llama3.1', anthropic: 'claude-sonnet-4-20250514', gemini: 'gemini-2.0-flash', openai: 'gpt-4o-mini' };
     this.model = config.model || defaultModels[this.providerName] || 'llama3.1';
     this.maxTokens = config.maxTokens || 4096;
     this.ollamaUrl = config.ollamaUrl || 'http://localhost:11434';
@@ -651,6 +840,11 @@ class AIService {
     } else if (this.providerName === 'gemini') {
       this.provider = new GeminiProvider({
         apiKey: config.geminiApiKey,
+        model: this.model
+      });
+    } else if (this.providerName === 'openai') {
+      this.provider = new OpenAIProvider({
+        apiKey: config.openaiApiKey,
         model: this.model
       });
     } else {
@@ -692,6 +886,8 @@ class AIService {
       apiKeyPreview: config.apiKey ? `${config.apiKey.slice(0, 10)}...${config.apiKey.slice(-4)}` : null,
       hasGeminiKey: !!config.geminiApiKey,
       geminiKeyPreview: config.geminiApiKey ? `${config.geminiApiKey.slice(0, 8)}...${config.geminiApiKey.slice(-4)}` : null,
+      hasOpenaiKey: !!config.openaiApiKey,
+      openaiKeyPreview: config.openaiApiKey ? `${config.openaiApiKey.slice(0, 8)}...${config.openaiApiKey.slice(-4)}` : null,
       model: config.model || this.model,
       maxTokens: config.maxTokens || this.maxTokens,
       ollamaUrl: config.ollamaUrl || 'http://localhost:11434',
@@ -711,10 +907,10 @@ class AIService {
   async validateApiKey(providerName, apiKey) {
     try {
       if (providerName === 'gemini') {
-        // Test with a minimal Gemini call
-        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-        const result = await new Promise((resolve, reject) => {
-          const parsedUrl = new URL(url);
+        // Step 1: Check key can list models
+        const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+        const listResult = await new Promise((resolve, reject) => {
+          const parsedUrl = new URL(listUrl);
           const req = https.request(parsedUrl, { method: 'GET' }, (res) => {
             let data = '';
             res.on('data', (chunk) => data += chunk);
@@ -724,7 +920,7 @@ class AIService {
                 if (json.error) {
                   resolve({ valid: false, error: json.error.message || 'Clé invalide' });
                 } else {
-                  resolve({ valid: true, models: (json.models || []).length });
+                  resolve({ valid: true, models: (json.models || []).map(m => m.name) });
                 }
               } catch {
                 resolve({ valid: false, error: 'Réponse invalide' });
@@ -736,7 +932,116 @@ class AIService {
           });
           req.end();
         });
-        return result;
+
+        if (!listResult.valid) return listResult;
+
+        // Step 2: Test actual generation with a minimal call
+        const testModel = 'gemini-2.0-flash-lite'; // cheapest model
+        const genUrl = `https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${apiKey}`;
+        const genBody = JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'Hi' }] }],
+          generationConfig: { maxOutputTokens: 5 }
+        });
+
+        const genResult = await new Promise((resolve) => {
+          const parsedUrl = new URL(genUrl);
+          const req = https.request(parsedUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+              try {
+                const json = JSON.parse(data);
+                if (res.statusCode === 429 || (json.error && (
+                  json.error.message?.includes('quota') ||
+                  json.error.message?.includes('RESOURCE_EXHAUSTED') ||
+                  json.error.status === 'RESOURCE_EXHAUSTED'
+                ))) {
+                  // Check if limit is 0 (never had access) vs. temporarily exhausted
+                  const msg = json.error?.message || '';
+                  if (msg.includes('limit: 0')) {
+                    resolve({
+                      valid: false,
+                      error: `Clé valide mais quota = 0 pour ${testModel}. Votre clé API n'a pas accès au free tier de Gemini. Recréez-la sur https://aistudio.google.com/apikey (les clés Google Cloud Console n'ont pas toujours le free tier activé). En UE, certains modèles peuvent être indisponibles.`
+                    });
+                  } else {
+                    resolve({ valid: true, note: 'Clé valide (quota temporairement atteint, réessayez dans 1-2 min)' });
+                  }
+                } else if (json.error) {
+                  if (res.statusCode === 400 && json.error.message?.includes('API_KEY_INVALID')) {
+                    resolve({ valid: false, error: 'Clé API invalide' });
+                  } else if (res.statusCode === 403) {
+                    resolve({ valid: false, error: `Accès refusé: ${json.error.message || 'API non activée'}` });
+                  } else {
+                    // Other error but key worked for listing - probably valid
+                    resolve({ valid: true, note: `Clé valide (${json.error.message || 'avertissement mineur'})` });
+                  }
+                } else {
+                  resolve({ valid: true, note: `Clé valide, ${testModel} fonctionne ✓` });
+                }
+              } catch {
+                resolve({ valid: true, note: 'Clé probablement valide (réponse inattendue au test)' });
+              }
+            });
+          });
+          req.on('error', (err) => {
+            resolve({ valid: true, note: `Clé valide pour lister les modèles (test génération échoué: ${err.message})` });
+          });
+          req.write(genBody);
+          req.end();
+        });
+
+        return genResult;
+      } else if (providerName === 'openai') {
+        // Test with a minimal OpenAI call
+        const testBody = JSON.stringify({
+          model: 'gpt-4o-mini',
+          max_tokens: 5,
+          messages: [{ role: 'user', content: 'Hi' }]
+        });
+        const openaiResult = await new Promise((resolve) => {
+          const url = new URL('https://api.openai.com/v1/chat/completions');
+          const req = https.request(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            }
+          }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+              try {
+                const json = JSON.parse(data);
+                if (res.statusCode === 401) {
+                  resolve({ valid: false, error: 'Clé API invalide' });
+                } else if (res.statusCode === 429) {
+                  resolve({ valid: true, note: 'Clé valide (rate limit temporaire)' });
+                } else if (res.statusCode === 402 || res.statusCode === 403) {
+                  resolve({ valid: false, error: json.error?.message || 'Accès refusé — vérifiez votre abonnement OpenAI' });
+                } else if (json.error) {
+                  // Insufficient quota = key is valid but no credits
+                  if (json.error.code === 'insufficient_quota') {
+                    resolve({ valid: false, error: 'Clé valide mais solde épuisé. Rechargez votre compte sur platform.openai.com/account/billing' });
+                  }
+                  resolve({ valid: false, error: json.error.message || 'Erreur OpenAI' });
+                } else {
+                  resolve({ valid: true, note: 'Clé valide, gpt-4o-mini fonctionne ✓' });
+                }
+              } catch {
+                resolve({ valid: false, error: 'Réponse invalide' });
+              }
+            });
+          });
+          req.on('error', (err) => {
+            resolve({ valid: false, error: err.message || 'Erreur de connexion' });
+          });
+          req.write(testBody);
+          req.end();
+        });
+        return openaiResult;
       } else if (providerName === 'anthropic') {
         // Test with the Anthropic SDK
         try {
@@ -877,8 +1182,10 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
     if (error.message?.startsWith('OLLAMA_CONNECTION_ERROR')) throw error;
     if (error.message?.startsWith('GEMINI_CONNECTION_ERROR')) throw error;
     if (error.message?.startsWith('GEMINI_QUOTA_EXHAUSTED')) throw error;
+    if (error.message?.startsWith('OPENAI_CONNECTION_ERROR')) throw error;
+    if (error.message?.startsWith('OPENAI_RATE_LIMITED')) throw error;
+    if (error.message?.startsWith('OPENAI_ERROR')) throw error;
     if (error.message?.startsWith('GEMINI_ERROR')) {
-      // Make quota errors more user-friendly
       if (error.message.includes('quota') || error.message.includes('RESOURCE_EXHAUSTED')) {
         throw new Error('GEMINI_QUOTA_EXHAUSTED: Quota Gemini épuisé. Attendez 1-2 minutes ou changez de fournisseur dans Paramètres IA.');
       }
@@ -886,7 +1193,7 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
     }
     if (error.message?.startsWith('API_KEY_MISSING')) throw error;
     if (error.status === 401) throw new Error('INVALID_API_KEY');
-    if (error.status === 429) throw new Error('GEMINI_QUOTA_EXHAUSTED: Rate limit atteint. Attendez quelques secondes et réessayez.');
+    if (error.status === 429) throw new Error('RATE_LIMITED: Rate limit atteint. Attendez quelques secondes et réessayez.');
     throw new Error(`API_ERROR: ${error.message}`);
   }
 
@@ -924,6 +1231,7 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
   isConfigured() {
     if (this.providerName === 'ollama') return true;
     if (this.providerName === 'gemini') return !!(this.provider && this.provider.apiKey);
+    if (this.providerName === 'openai') return !!(this.provider && this.provider.apiKey);
     return !!(this.provider && this.provider.client);
   }
 }
