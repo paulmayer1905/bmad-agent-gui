@@ -394,7 +394,11 @@ class GeminiProvider {
         let data = '';
         res.on('data', (chunk) => data += chunk);
         res.on('end', () => {
-          try { resolve(JSON.parse(data)); }
+          try {
+            const json = JSON.parse(data);
+            json._httpStatus = res.statusCode;
+            resolve(json);
+          }
           catch { reject(new Error('Invalid JSON from Gemini API')); }
         });
       });
@@ -411,6 +415,206 @@ class GeminiProvider {
 
   async isAvailable() {
     return !!this.apiKey;
+  }
+
+  // --- Retry + fallback logic ---
+  static FALLBACK_MODELS = [
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+  ];
+
+  async chatWithFallback(messages, systemPrompt, maxTokens) {
+    // Build ordered model list: current model first, then fallbacks
+    const models = [this.model, ...GeminiProvider.FALLBACK_MODELS.filter(m => m !== this.model)];
+    let lastError = null;
+
+    for (const modelId of models) {
+      try {
+        const result = await this._chatWithModel(modelId, messages, systemPrompt, maxTokens);
+        if (modelId !== this.model) {
+          result.content = `[Modèle ${this.model} indisponible — basculé sur ${modelId}]\n\n` + result.content;
+          result.fallbackModel = modelId;
+        }
+        return result;
+      } catch (err) {
+        lastError = err;
+        const msg = err.message || '';
+        // Only fallback on quota/rate-limit errors
+        if (msg.includes('quota') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('rate')) {
+          console.warn(`Gemini model ${modelId} quota exceeded, trying next...`);
+          continue;
+        }
+        throw err; // Non-quota error, don't fallback
+      }
+    }
+    // All models exhausted
+    throw new Error('GEMINI_QUOTA_EXHAUSTED: Quota épuisé sur tous les modèles Gemini. Attendez quelques minutes ou passez à un autre fournisseur (Ollama est gratuit et illimité).');
+  }
+
+  async _chatWithModel(modelId, messages, systemPrompt, maxTokens) {
+    if (!this.apiKey) throw new Error('API_KEY_MISSING');
+
+    const contents = messages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+
+    const body = JSON.stringify({
+      contents,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: { maxOutputTokens: maxTokens || 4096 }
+    });
+
+    const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
+    const response = await this._fetch(url, body);
+
+    if (response.error) {
+      throw new Error(`GEMINI_ERROR: ${response.error.message || JSON.stringify(response.error)}`);
+    }
+
+    const text = response.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+    const usage = response.usageMetadata || {};
+
+    return {
+      content: text,
+      usage: {
+        input_tokens: usage.promptTokenCount || 0,
+        output_tokens: usage.candidatesTokenCount || 0
+      },
+      model: modelId,
+      stopReason: response.candidates?.[0]?.finishReason || 'STOP'
+    };
+  }
+
+  async streamChatWithFallback(messages, systemPrompt, maxTokens, onChunk) {
+    const models = [this.model, ...GeminiProvider.FALLBACK_MODELS.filter(m => m !== this.model)];
+    let lastError = null;
+
+    for (const modelId of models) {
+      try {
+        if (modelId !== this.model) {
+          onChunk({ type: 'text', text: `[Modèle ${this.model} indisponible — basculé sur ${modelId}]\n\n` });
+        }
+        return await this._streamWithModel(modelId, messages, systemPrompt, maxTokens, onChunk);
+      } catch (err) {
+        lastError = err;
+        const msg = err.message || '';
+        if (msg.includes('quota') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('rate')) {
+          console.warn(`Gemini stream model ${modelId} quota exceeded, trying next...`);
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error('GEMINI_QUOTA_EXHAUSTED: Quota épuisé sur tous les modèles Gemini. Attendez quelques minutes ou passez à un autre fournisseur.');
+  }
+
+  async _streamWithModel(modelId, messages, systemPrompt, maxTokens, onChunk) {
+    if (!this.apiKey) throw new Error('API_KEY_MISSING');
+
+    const contents = messages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+
+    const body = JSON.stringify({
+      contents,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: { maxOutputTokens: maxTokens || 4096 }
+    });
+
+    const url = `${this.baseUrl}/models/${modelId}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
+
+    return new Promise((resolve, reject) => {
+      const parsedUrl = new URL(url);
+      const req = https.request(parsedUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }, (res) => {
+        // Check for HTTP error status before streaming
+        if (res.statusCode === 429 || res.statusCode === 403) {
+          let data = '';
+          res.on('data', (chunk) => data += chunk);
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(data);
+              reject(new Error(`GEMINI_ERROR: ${json.error?.message || 'quota exceeded'}`));
+            } catch {
+              reject(new Error('GEMINI_ERROR: quota exceeded (HTTP ' + res.statusCode + ')'));
+            }
+          });
+          return;
+        }
+
+        let fullText = '';
+        let buffer = '';
+        let lastUsage = null;
+
+        res.on('data', (chunk) => {
+          buffer += chunk.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr) continue;
+            try {
+              const json = JSON.parse(jsonStr);
+              if (json.error) {
+                reject(new Error(`GEMINI_ERROR: ${json.error.message || 'streaming error'}`));
+                return;
+              }
+              if (json.usageMetadata) lastUsage = json.usageMetadata;
+              const text = json.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+              if (text) {
+                fullText += text;
+                if (onChunk) onChunk({ type: 'text', text });
+              }
+            } catch { /* skip */ }
+          }
+        });
+
+        res.on('end', () => {
+          if (buffer.trim()) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              try {
+                const json = JSON.parse(line.slice(6).trim());
+                if (json.usageMetadata) lastUsage = json.usageMetadata;
+                const text = json.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+                if (text) {
+                  fullText += text;
+                  if (onChunk) onChunk({ type: 'text', text });
+                }
+              } catch { /* skip */ }
+            }
+          }
+          resolve({
+            content: fullText,
+            usage: {
+              input_tokens: lastUsage?.promptTokenCount || 0,
+              output_tokens: lastUsage?.candidatesTokenCount || 0
+            },
+            model: modelId,
+            stopReason: 'STOP'
+          });
+        });
+
+        res.on('error', reject);
+      });
+
+      req.on('error', (err) => {
+        const msg = err.message || err.code || 'connexion échouée';
+        reject(new Error(`GEMINI_CONNECTION_ERROR: ${msg}`));
+      });
+
+      req.write(body);
+      req.end();
+    });
   }
 }
 
@@ -612,7 +816,11 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
       : [{ role: 'user', content: 'Hello, please introduce yourself and tell me how you can help.' }];
 
     try {
-      const result = await this.provider.chat(messages, conversation.systemPrompt, this.maxTokens);
+      // Use fallback-enabled chat for Gemini
+      const chatMethod = (this.providerName === 'gemini' && this.provider.chatWithFallback)
+        ? this.provider.chatWithFallback.bind(this.provider)
+        : this.provider.chat.bind(this.provider);
+      const result = await chatMethod(messages, conversation.systemPrompt, this.maxTokens);
 
       if (conversation.messages.length === 0) {
         conversation.messages.push(
@@ -644,7 +852,11 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
       : [{ role: 'user', content: 'Hello, please introduce yourself and tell me how you can help.' }];
 
     try {
-      const result = await this.provider.streamChat(messages, conversation.systemPrompt, this.maxTokens, onChunk);
+      // Use fallback-enabled streaming for Gemini
+      const streamMethod = (this.providerName === 'gemini' && this.provider.streamChatWithFallback)
+        ? this.provider.streamChatWithFallback.bind(this.provider)
+        : this.provider.streamChat.bind(this.provider);
+      const result = await streamMethod(messages, conversation.systemPrompt, this.maxTokens, onChunk);
 
       if (conversation.messages.length === 0) {
         conversation.messages.push(
@@ -664,10 +876,17 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
   _handleError(error) {
     if (error.message?.startsWith('OLLAMA_CONNECTION_ERROR')) throw error;
     if (error.message?.startsWith('GEMINI_CONNECTION_ERROR')) throw error;
-    if (error.message?.startsWith('GEMINI_ERROR')) throw error;
+    if (error.message?.startsWith('GEMINI_QUOTA_EXHAUSTED')) throw error;
+    if (error.message?.startsWith('GEMINI_ERROR')) {
+      // Make quota errors more user-friendly
+      if (error.message.includes('quota') || error.message.includes('RESOURCE_EXHAUSTED')) {
+        throw new Error('GEMINI_QUOTA_EXHAUSTED: Quota Gemini épuisé. Attendez 1-2 minutes ou changez de fournisseur dans Paramètres IA.');
+      }
+      throw error;
+    }
     if (error.message?.startsWith('API_KEY_MISSING')) throw error;
     if (error.status === 401) throw new Error('INVALID_API_KEY');
-    if (error.status === 429) throw new Error('RATE_LIMITED');
+    if (error.status === 429) throw new Error('GEMINI_QUOTA_EXHAUSTED: Rate limit atteint. Attendez quelques secondes et réessayez.');
     throw new Error(`API_ERROR: ${error.message}`);
   }
 

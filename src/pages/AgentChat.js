@@ -110,6 +110,8 @@ export default function AgentChat() {
         setError('no_api_key');
       } else if (errMsg.includes('OLLAMA_CONNECTION_ERROR') || errMsg.includes('ECONNREFUSED') || errMsg.includes('connexion') || errMsg.includes('fetch failed')) {
         setError('ollama_not_running');
+      } else if (errMsg.includes('GEMINI_QUOTA_EXHAUSTED')) {
+        setError('gemini_quota:' + errMsg.replace(/GEMINI_QUOTA_EXHAUSTED:\s*/, ''));
       } else if (errMsg.includes('GEMINI_ERROR') || errMsg.includes('GEMINI_CONNECTION_ERROR')) {
         setError('gemini_error:' + errMsg.replace(/GEMINI_(CONNECTION_)?ERROR:\s*/, ''));
       } else {
@@ -257,6 +259,37 @@ export default function AgentChat() {
                 </button>
                 <button className="btn btn-ghost" onClick={handleRetry}>
                   🔄 Réessayer
+                </button>
+              </div>
+            </>
+          ) : error.startsWith && error.startsWith('gemini_quota:') ? (
+            <>
+              <div className="chat-setup-icon">⏳</div>
+              <h3>Quota Gemini épuisé</h3>
+              <p style={{ marginBottom: 12 }}>
+                {error.replace('gemini_quota:', '')}
+              </p>
+              <div style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '16px 20px',
+                marginBottom: 20,
+                textAlign: 'left',
+                fontSize: 14,
+                lineHeight: 1.8
+              }}>
+                <strong>💡 Solutions :</strong><br />
+                1. <strong>Attendez 1-2 minutes</strong> puis cliquez « Réessayer » (l'app teste automatiquement d'autres modèles)<br />
+                2. <strong>Utilisez Ollama</strong> (gratuit, illimité, local) dans Paramètres IA<br />
+                3. Ou changez de modèle dans les paramètres Gemini
+              </div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="btn btn-primary" onClick={handleRetry}>
+                  🔄 Réessayer (avec fallback auto)
+                </button>
+                <button className="btn btn-secondary" onClick={() => navigate('/ai-settings')}>
+                  ⚙️ Paramètres IA
                 </button>
               </div>
             </>
