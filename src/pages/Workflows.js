@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
 export default function Workflows() {
+  const navigate = useNavigate();
   const [workflows, setWorkflows] = useState([]);
   const [agents, setAgents] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -37,8 +39,8 @@ export default function Workflows() {
   return (
     <>
       <div className="page-header">
-        <h2>Workflows & Teams</h2>
-        <p>Visualize development workflows and agent team configurations</p>
+        <h2>Workflows & Équipes</h2>
+        <p>Processus de développement et configurations d'équipes d'agents</p>
       </div>
 
       <div className="page-content animate-in">
@@ -91,14 +93,22 @@ export default function Workflows() {
             <div>
               {selected ? (
                 <div className="card">
-                  <h3 style={{ marginBottom: 16 }}>{selected.title || selected.name}</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <h3>{selected.title || selected.name}</h3>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => navigate(`/chat/bmad-orchestrator?workflow=${encodeURIComponent(selected.name)}`)}
+                    >
+                      🚀 Exécuter
+                    </button>
+                  </div>
                   <div className="code-block" style={{ maxHeight: 600, overflow: 'auto' }}>
                     {selected.rawContent}
                   </div>
                 </div>
               ) : (
                 <div className="empty-state">
-                  <p>Select a workflow to view details</p>
+                  <p>Sélectionnez un workflow pour voir les détails</p>
                 </div>
               )}
             </div>
@@ -158,7 +168,7 @@ export default function Workflows() {
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 2 }}>Orchestration</div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
                 {agents.filter(a => ['bmad-master', 'bmad-orchestrator'].includes(a.name)).map(a => (
-                  <div key={a.name} className="workflow-node" style={{ borderColor: agentColors[a.name] }}>
+                  <div key={a.name} className="workflow-node" style={{ borderColor: agentColors[a.name], cursor: 'pointer' }} onClick={() => navigate(`/chat/${a.name}`)} title={`Discuter avec ${a.title}`}>
                     <span style={{ fontSize: 24 }}>{a.icon || '🤖'}</span>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{a.title}</div>
@@ -177,7 +187,7 @@ export default function Workflows() {
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 2 }}>Planning & Analysis</div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
                 {agents.filter(a => ['analyst', 'po', 'pm', 'architect'].includes(a.name)).map(a => (
-                  <div key={a.name} className="workflow-node" style={{ borderColor: agentColors[a.name] }}>
+                  <div key={a.name} className="workflow-node" style={{ borderColor: agentColors[a.name], cursor: 'pointer' }} onClick={() => navigate(`/chat/${a.name}`)} title={`Discuter avec ${a.title}`}>
                     <span style={{ fontSize: 24 }}>{a.icon || '🤖'}</span>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{a.title}</div>
@@ -196,7 +206,7 @@ export default function Workflows() {
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 2 }}>Execution & Quality</div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
                 {agents.filter(a => ['dev', 'qa', 'ux-expert', 'sm'].includes(a.name)).map(a => (
-                  <div key={a.name} className="workflow-node" style={{ borderColor: agentColors[a.name] }}>
+                  <div key={a.name} className="workflow-node" style={{ borderColor: agentColors[a.name], cursor: 'pointer' }} onClick={() => navigate(`/chat/${a.name}`)} title={`Discuter avec ${a.title}`}>
                     <span style={{ fontSize: 24 }}>{a.icon || '🤖'}</span>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{a.title}</div>

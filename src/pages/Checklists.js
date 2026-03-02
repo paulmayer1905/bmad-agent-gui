@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
 export default function Checklists() {
+  const navigate = useNavigate();
   const [checklists, setChecklists] = useState([]);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -21,7 +23,7 @@ export default function Checklists() {
     <>
       <div className="page-header">
         <h2>Checklists</h2>
-        <p>BMAD-METHOD quality and process checklists</p>
+        <p>Checklists qualité et processus — vérifiez avec un agent IA</p>
       </div>
 
       <div className="page-content animate-in">
@@ -67,7 +69,15 @@ export default function Checklists() {
             <div>
               {detail ? (
                 <div className="card">
-                  <h3 style={{ marginBottom: 16 }}>{detail.title || selected}</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <h3>{detail.title || selected}</h3>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => navigate(`/chat/qa?checklist=${encodeURIComponent(selected)}`)}
+                    >
+                      🐛 Vérifier avec QA
+                    </button>
+                  </div>
                   {detail.items && detail.items.length > 0 ? (
                     <div style={{ display: 'grid', gap: 8 }}>
                       {detail.items.map((item, i) => (
@@ -99,7 +109,7 @@ export default function Checklists() {
                 </div>
               ) : (
                 <div className="empty-state">
-                  <p>Select a checklist to view</p>
+                  <p>Sélectionnez une checklist pour la consulter</p>
                 </div>
               )}
             </div>

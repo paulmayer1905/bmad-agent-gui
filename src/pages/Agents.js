@@ -35,7 +35,7 @@ export default function Agents() {
     <>
       <div className="page-header">
         <h2>Agents</h2>
-        <p>BMAD-METHOD specialized AI agents</p>
+        <p>Agents IA spécialisés de la BMAD-METHOD — cliquez pour discuter</p>
       </div>
       <div className="page-content animate-in">
         {/* Search */}
@@ -43,19 +43,19 @@ export default function Agents() {
           <span className="search-icon">🔍</span>
           <input
             className="search-input"
-            placeholder="Search agents by name, role, or capability..."
+            placeholder="Rechercher un agent par nom, rôle ou capacité..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
 
         {loading ? (
-          <div className="empty-state"><div className="pulse">Loading agents...</div></div>
+          <div className="empty-state"><div className="pulse">Chargement des agents...</div></div>
         ) : filtered.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">🔍</div>
-            <h3>No agents found</h3>
-            <p>Try a different search term</p>
+            <h3>Aucun agent trouvé</h3>
+            <p>Essayez un autre terme de recherche</p>
           </div>
         ) : (
           <div className="grid-3">
@@ -63,7 +63,7 @@ export default function Agents() {
               <div
                 key={agent.name}
                 className="card card-clickable"
-                onClick={() => navigate(`/agents/${agent.name}`)}
+                onClick={() => navigate(`/chat/${agent.name}`)}
                 style={{ position: 'relative', overflow: 'hidden' }}
               >
                 {/* Color accent bar */}
@@ -94,15 +94,16 @@ export default function Agents() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     className="btn btn-sm btn-primary"
+                    style={{ flex: 1 }}
                     onClick={e => {
                       e.stopPropagation();
-                      api.sessions.create(agent.name, {}).then(() => navigate('/sessions'));
+                      navigate(`/chat/${agent.name}`);
                     }}
                   >
-                    Start Session
+                    💬 Discuter
                   </button>
                   <button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); navigate(`/agents/${agent.name}`); }}>
-                    Details
+                    Détails
                   </button>
                 </div>
               </div>

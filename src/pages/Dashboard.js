@@ -2,46 +2,64 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
+const agentColors = {
+  'bmad-master': 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+  'bmad-orchestrator': 'linear-gradient(135deg, #3b82f6, #2563eb)',
+  'pm': 'linear-gradient(135deg, #10b981, #059669)',
+  'architect': 'linear-gradient(135deg, #f97316, #ea580c)',
+  'dev': 'linear-gradient(135deg, #06b6d4, #0891b2)',
+  'qa': 'linear-gradient(135deg, #ef4444, #dc2626)',
+  'ux-expert': 'linear-gradient(135deg, #ec4899, #db2777)',
+  'sm': 'linear-gradient(135deg, #f59e0b, #d97706)',
+  'analyst': 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+  'po': 'linear-gradient(135deg, #14b8a6, #0d9488)',
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [agents, setAgents] = useState([]);
-  const [sessions, setSessions] = useState([]);
-  const [metrics, setMetrics] = useState({ active: 0, completed: 0, failed: 0, total: 0, history: [] });
-  const [health, setHealth] = useState({});
+  const [activeChats, setActiveChats] = useState([]);
+  const [providerStatus, setProviderStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [a, s, m, h] = await Promise.all([
+        const [agentList, chats, aiConfig] = await Promise.all([
           api.agents.list(),
-          api.sessions.list(),
-          api.queue.metrics(),
-          api.system.health(),
+          api.chat.list(),
+          api.ai.getConfig(),
         ]);
-        setAgents(a);
-        setSessions(s);
-        setMetrics(m);
-        setHealth(h);
+        setAgents(agentList);
+        setActiveChats(chats);
+
+        // Check provider readiness
+        const provider = aiConfig.provider || 'ollama';
+        if (provider === 'ollama') {
+          try {
+            const status = await api.ai.ollamaStatus();
+            setProviderStatus({ ready: status.available, provider: 'ollama', models: status.models || [], error: status.available ? null : 'not_running' });
+          } catch {
+            setProviderStatus({ ready: false, provider: 'ollama', error: 'not_running' });
+          }
+        } else {
+          const configured = await api.ai.isConfigured();
+          setProviderStatus({ ready: configured, provider, error: configured ? null : 'no_api_key' });
+        }
       } catch (err) {
         console.error('Dashboard load error:', err);
       }
       setLoading(false);
     }
     load();
-    const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
   }, []);
-
-  const activeSessions = sessions.filter(s => s.status === 'active');
-  const suspendedSessions = sessions.filter(s => s.status === 'suspended');
 
   if (loading) {
     return (
       <div className="page-content">
         <div className="empty-state">
           <div className="empty-state-icon pulse">🧠</div>
-          <h3>Loading BMAD Dashboard...</h3>
+          <h3>Chargement...</h3>
         </div>
       </div>
     );
@@ -50,154 +68,166 @@ export default function Dashboard() {
   return (
     <>
       <div className="page-header">
-        <h2>Dashboard</h2>
-        <p>Overview of your BMAD Agent ecosystem</p>
+        <h2>🧠 BMAD — Vos agents IA</h2>
+        <p>Choisissez un agent et commencez à discuter</p>
       </div>
       <div className="page-content animate-in">
-        {/* Stats Row */}
-        <div className="grid-4" style={{ marginBottom: 24 }}>
-          <div className="stat-card">
-            <div className="stat-label">Agents Available</div>
-            <div className="stat-value purple">{agents.length}</div>
-            <div className="stat-footer">Loaded from bmad-core</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Active Sessions</div>
-            <div className="stat-value green">{activeSessions.length}</div>
-            <div className="stat-footer">{suspendedSessions.length} suspended</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Queue: Completed</div>
-            <div className="stat-value blue">{metrics.completed}</div>
-            <div className="stat-footer">{metrics.active} in progress</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Queue: Failed</div>
-            <div className="stat-value red">{metrics.failed}</div>
-            <div className="stat-footer">{metrics.total} total messages</div>
-          </div>
-        </div>
 
-        {/* Quick Actions */}
-        <div style={{ marginBottom: 24 }}>
-          <h3 style={{ marginBottom: 12, fontSize: 16 }}>Quick Actions</h3>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" onClick={() => navigate('/agents')}>
-              🤖 Launch Agent
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate('/sessions')}>
-              💬 View Sessions
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate('/queue')}>
-              📨 Queue Monitor
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate('/workflows')}>
-              🔀 Workflows
-            </button>
-          </div>
-        </div>
-
-        {/* Agent Grid */}
-        <div style={{ marginBottom: 24 }}>
-          <h3 style={{ marginBottom: 12, fontSize: 16 }}>Available Agents</h3>
-          <div className="grid-3">
-            {agents.slice(0, 6).map(agent => (
-              <div
-                key={agent.name}
-                className="card card-clickable"
-                onClick={() => navigate(`/agents/${agent.name}`)}
-              >
-                <div className="card-header">
-                  <div className="card-icon">{agent.icon || '🤖'}</div>
-                  <div>
-                    <div className="card-title">{agent.title || agent.name}</div>
-                    <div className="card-subtitle">{agent.name}</div>
-                  </div>
-                </div>
-                {agent.whenToUse && (
-                  <div className="card-body" style={{ fontSize: 13 }}>
-                    {agent.whenToUse.slice(0, 100)}{agent.whenToUse.length > 100 ? '...' : ''}
-                  </div>
-                )}
+        {/* Provider Status Banner */}
+        {providerStatus && !providerStatus.ready && (
+          <div style={{
+            padding: '16px 20px',
+            marginBottom: 24,
+            borderRadius: 'var(--radius-md)',
+            background: 'rgba(251, 191, 36, 0.1)',
+            border: '1px solid rgba(251, 191, 36, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12
+          }}>
+            <span style={{ fontSize: 24 }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Fournisseur IA non configuré</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                {providerStatus.provider === 'ollama'
+                  ? 'Ollama n\'est pas démarré. Lancez Ollama ou choisissez un autre fournisseur.'
+                  : `Clé API ${providerStatus.provider} manquante. Configurez-la dans les paramètres.`}
               </div>
-            ))}
-          </div>
-          {agents.length > 6 && (
-            <div style={{ textAlign: 'center', marginTop: 12 }}>
-              <button className="btn btn-ghost" onClick={() => navigate('/agents')}>
-                View all {agents.length} agents →
-              </button>
             </div>
-          )}
-        </div>
-
-        {/* Recent Sessions */}
-        {sessions.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <h3 style={{ marginBottom: 12, fontSize: 16 }}>Recent Sessions</h3>
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Agent</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Last Activity</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sessions.slice(0, 5).map(session => (
-                    <tr key={session.id}>
-                      <td>
-                        <span style={{ marginRight: 8 }}>{session.ui?.icon || '🤖'}</span>
-                        {session.ui?.displayName || session.agent}
-                      </td>
-                      <td>
-                        <span className={`badge badge-${session.status}`}>{session.status}</span>
-                      </td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                        {new Date(session.created).toLocaleString()}
-                      </td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                        {new Date(session.lastActivity).toLocaleTimeString()}
-                      </td>
-                      <td>
-                        {session.status === 'suspended' ? (
-                          <button className="btn btn-sm btn-secondary" onClick={() => api.sessions.resume(session.id)}>
-                            Resume
-                          </button>
-                        ) : (
-                          <button className="btn btn-sm btn-ghost" onClick={() => navigate('/sessions')}>
-                            View
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <button className="btn btn-primary" onClick={() => navigate('/ai-settings')}>
+              ⚙️ Configurer
+            </button>
           </div>
         )}
 
-        {/* System Health */}
-        {health.checks && (
-          <div>
-            <h3 style={{ marginBottom: 12, fontSize: 16 }}>System Health</h3>
-            <div className="grid-3">
-              {Object.entries(health.checks).map(([key, ok]) => (
-                <div key={key} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16 }}>
-                  <span className={`health-dot ${ok ? '' : 'error'}`}></span>
-                  <span style={{ fontSize: 14 }}>{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}</span>
-                  <span style={{ marginLeft: 'auto', fontSize: 12, color: ok ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                    {ok ? '✓ OK' : '✗ Failed'}
-                  </span>
+        {providerStatus && providerStatus.ready && (
+          <div style={{
+            padding: '12px 20px',
+            marginBottom: 24,
+            borderRadius: 'var(--radius-md)',
+            background: 'rgba(16, 185, 129, 0.1)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            fontSize: 14
+          }}>
+            <span style={{ fontSize: 16 }}>✅</span>
+            <span>
+              Fournisseur <strong>{providerStatus.provider}</strong> prêt
+              {providerStatus.models?.length > 0 && ` — ${providerStatus.models.length} modèle(s) disponible(s)`}
+            </span>
+          </div>
+        )}
+
+        {/* Active Chats */}
+        {activeChats.length > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <h3 style={{ marginBottom: 12, fontSize: 16 }}>💬 Conversations en cours</h3>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {activeChats.map(chat => (
+                <div
+                  key={chat.sessionId || chat.agent}
+                  className="card card-clickable"
+                  onClick={() => navigate(`/chat/${chat.agent}`)}
+                  style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}
+                >
+                  <div style={{
+                    width: 40, height: 40, borderRadius: '50%',
+                    background: agentColors[chat.agent] || 'var(--bg-tertiary)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20
+                  }}>
+                    {chat.icon || '🤖'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{chat.title || chat.agent}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      {chat.messageCount ? `${chat.messageCount} messages` : 'Conversation active'}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 13, color: 'var(--accent-purple)' }}>Reprendre →</span>
                 </div>
               ))}
             </div>
           </div>
         )}
+
+        {/* Main Agent Grid - Action oriented */}
+        <div style={{ marginBottom: 28 }}>
+          <h3 style={{ marginBottom: 14, fontSize: 16 }}>
+            🤖 {activeChats.length > 0 ? 'Démarrer une nouvelle conversation' : 'Choisissez un agent pour démarrer'}
+          </h3>
+          <div className="grid-3">
+            {agents.map(agent => (
+              <div
+                key={agent.name}
+                className="card card-clickable"
+                onClick={() => navigate(`/chat/${agent.name}`)}
+                style={{ position: 'relative', overflow: 'hidden', cursor: 'pointer' }}
+              >
+                {/* Color accent bar */}
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+                  background: agentColors[agent.name] || 'var(--accent-purple)'
+                }} />
+
+                <div className="card-header" style={{ marginTop: 4 }}>
+                  <div className="card-icon" style={{
+                    background: agentColors[agent.name] || 'var(--bg-tertiary)',
+                    fontSize: 24
+                  }}>
+                    {agent.icon || '🤖'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div className="card-title">{agent.title || agent.name}</div>
+                    <div className="card-subtitle" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{agent.name}</div>
+                  </div>
+                </div>
+
+                {agent.whenToUse && (
+                  <div className="card-body" style={{ fontSize: 13, marginBottom: 12, lineHeight: 1.5 }}>
+                    {agent.whenToUse.length > 120 ? agent.whenToUse.slice(0, 120) + '...' : agent.whenToUse}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn btn-sm btn-primary"
+                    style={{ flex: 1 }}
+                    onClick={e => { e.stopPropagation(); navigate(`/chat/${agent.name}`); }}
+                  >
+                    💬 Discuter
+                  </button>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={e => { e.stopPropagation(); navigate(`/agents/${agent.name}`); }}
+                  >
+                    Détails
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick links row */}
+        <div style={{
+          display: 'flex', gap: 12, flexWrap: 'wrap',
+          padding: '16px 0', borderTop: '1px solid var(--border)'
+        }}>
+          <button className="btn btn-ghost" onClick={() => navigate('/tasks')}>
+            📝 Voir les tâches
+          </button>
+          <button className="btn btn-ghost" onClick={() => navigate('/checklists')}>
+            ✅ Checklists
+          </button>
+          <button className="btn btn-ghost" onClick={() => navigate('/workflows')}>
+            🔀 Workflows
+          </button>
+          <button className="btn btn-ghost" onClick={() => navigate('/ai-settings')}>
+            ⚙️ Paramètres IA
+          </button>
+        </div>
       </div>
     </>
   );

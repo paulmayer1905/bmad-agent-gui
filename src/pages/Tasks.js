@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
 export default function Tasks() {
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -26,8 +28,8 @@ export default function Tasks() {
   return (
     <>
       <div className="page-header">
-        <h2>Tasks</h2>
-        <p>BMAD-METHOD task definitions and templates</p>
+        <h2>Tâches</h2>
+        <p>Tâches et modèles de la BMAD-METHOD — lancez une tâche avec un agent</p>
       </div>
 
       <div className="page-content animate-in">
@@ -41,7 +43,7 @@ export default function Tasks() {
                 <span className="search-icon">🔍</span>
                 <input
                   className="search-input"
-                  placeholder="Search tasks..."
+                  placeholder="Rechercher une tâche..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
@@ -79,7 +81,15 @@ export default function Tasks() {
             <div>
               {detail ? (
                 <div className="card">
-                  <h3 style={{ marginBottom: 16 }}>{detail.title || selected}</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <h3>{detail.title || selected}</h3>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => navigate(`/chat/bmad-orchestrator?task=${encodeURIComponent(selected)}`)}
+                    >
+                      🚀 Lancer avec un agent
+                    </button>
+                  </div>
 
                   {detail.purpose && (
                     <div style={{ marginBottom: 16 }}>
@@ -133,7 +143,7 @@ export default function Tasks() {
                 </div>
               ) : (
                 <div className="empty-state">
-                  <p>Select a task to view details</p>
+                  <p>Sélectionnez une tâche pour voir les détails</p>
                 </div>
               )}
             </div>

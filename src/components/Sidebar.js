@@ -3,20 +3,18 @@ import { NavLink, useLocation } from 'react-router-dom';
 import api from '../api';
 
 const navItems = [
-  { section: 'Overview' },
-  { path: '/', icon: '📊', label: 'Dashboard' },
-  { section: 'Agents' },
-  { path: '/chat', icon: '💬', label: 'Chat Agent', highlight: true },
-  { path: '/agents', icon: '🤖', label: 'Tous les Agents' },
-  { path: '/sessions', icon: '🔄', label: 'Sessions' },
-  { section: 'Operations' },
-  { path: '/queue', icon: '📨', label: 'Queue Monitor' },
-  { path: '/workflows', icon: '🔀', label: 'Workflows' },
-  { section: 'Resources' },
+  { section: 'Actions' },
+  { path: '/', icon: '🏠', label: 'Accueil' },
+  { path: '/chat', icon: '💬', label: 'Discuter', highlight: true },
+  { path: '/agents', icon: '🤖', label: 'Agents' },
+  { section: 'Ressources' },
+  { path: '/tasks', icon: '📝', label: 'Tâches' },
   { path: '/checklists', icon: '✅', label: 'Checklists' },
-  { path: '/tasks', icon: '📝', label: 'Tasks' },
-  { section: 'System' },
-  { path: '/ai-settings', icon: '🤖', label: 'Paramètres IA' },
+  { path: '/workflows', icon: '🔀', label: 'Workflows' },
+  { section: 'Système' },
+  { path: '/ai-settings', icon: '🧠', label: 'Paramètres IA' },
+  { path: '/sessions', icon: '🔄', label: 'Sessions' },
+  { path: '/queue', icon: '📨', label: 'File d\'attente' },
   { path: '/config', icon: '⚙️', label: 'Configuration' },
 ];
 
