@@ -162,6 +162,7 @@ function registerIpcHandlers() {
   safeHandle('ai:config:update', (_, config) => backend.updateAIConfig(config));
   safeHandle('ai:configured', () => backend.isAIConfigured());
   safeHandle('ollama:status', () => backend.getOllamaStatus());
+  safeHandle('ai:validate-key', (_, provider, apiKey) => backend.validateApiKey(provider, apiKey));
 
   // Streaming chat (uses IPC events instead of invoke)
   ipcMain.on('chat:stream', async (event, sessionId, message) => {

@@ -504,6 +504,61 @@ class AIService {
     return { available, models, url: this.ollamaUrl };
   }
 
+  async validateApiKey(providerName, apiKey) {
+    try {
+      if (providerName === 'gemini') {
+        // Test with a minimal Gemini call
+        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+        const result = await new Promise((resolve, reject) => {
+          const parsedUrl = new URL(url);
+          const req = https.request(parsedUrl, { method: 'GET' }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+              try {
+                const json = JSON.parse(data);
+                if (json.error) {
+                  resolve({ valid: false, error: json.error.message || 'Clé invalide' });
+                } else {
+                  resolve({ valid: true, models: (json.models || []).length });
+                }
+              } catch {
+                resolve({ valid: false, error: 'Réponse invalide' });
+              }
+            });
+          });
+          req.on('error', (err) => {
+            resolve({ valid: false, error: err.message || 'Erreur de connexion' });
+          });
+          req.end();
+        });
+        return result;
+      } else if (providerName === 'anthropic') {
+        // Test with the Anthropic SDK
+        try {
+          const Anthropic = require('@anthropic-ai/sdk');
+          const client = new Anthropic({ apiKey });
+          await client.messages.create({
+            model: 'claude-3-5-haiku-20241022',
+            max_tokens: 5,
+            messages: [{ role: 'user', content: 'Hi' }]
+          });
+          return { valid: true };
+        } catch (err) {
+          if (err.status === 401) return { valid: false, error: 'Clé API invalide' };
+          if (err.status === 403) return { valid: false, error: 'Clé API sans permission' };
+          if (err.status === 429) return { valid: true, note: 'Clé valide (rate limit atteint)' };
+          // If error is about billing, key is valid but no credit
+          if (err.status === 400) return { valid: true, note: 'Clé valide' };
+          return { valid: false, error: err.message || 'Erreur inconnue' };
+        }
+      }
+      return { valid: false, error: 'Provider inconnu' };
+    } catch (err) {
+      return { valid: false, error: err.message || 'Erreur de validation' };
+    }
+  }
+
   buildSystemPrompt(agentDefinition, agentName) {
     return `You are operating as a BMAD-METHOD agent. Your complete agent definition follows below.
 Read it carefully and adopt the persona, role, and behavior described.

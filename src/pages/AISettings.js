@@ -42,6 +42,8 @@ export default function AISettings() {
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [checkingOllama, setCheckingOllama] = useState(false);
+  const [validatingKey, setValidatingKey] = useState(false);
+  const [keyValidation, setKeyValidation] = useState(null); // { valid, error, note }
 
   useEffect(() => {
     const load = async () => {
@@ -77,12 +79,27 @@ export default function AISettings() {
 
   const handleProviderChange = (p) => {
     setProvider(p);
+    setKeyValidation(null);
     if (p === 'ollama') {
       setModel('llama3.1');
     } else if (p === 'gemini') {
       setModel('gemini-2.0-flash');
     } else {
       setModel('claude-sonnet-4-20250514');
+    }
+  };
+
+  const handleValidateKey = async (providerName, key) => {
+    if (!key.trim()) return;
+    setValidatingKey(true);
+    setKeyValidation(null);
+    try {
+      const result = await api.ai.validateKey(providerName, key);
+      setKeyValidation(result);
+    } catch (err) {
+      setKeyValidation({ valid: false, error: err.message || 'Erreur de validation' });
+    } finally {
+      setValidatingKey(false);
     }
   };
 
@@ -260,14 +277,28 @@ export default function AISettings() {
                   <input
                     type={showGeminiKey ? 'text' : 'password'}
                     value={geminiApiKey}
-                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                    onChange={(e) => { setGeminiApiKey(e.target.value); setKeyValidation(null); }}
                     placeholder="AIza..."
                     className="form-input"
                   />
                   <button className="btn btn-ghost btn-sm" onClick={() => setShowGeminiKey(!showGeminiKey)}>
                     {showGeminiKey ? '🙈' : '👁️'}
                   </button>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => handleValidateKey('gemini', geminiApiKey)}
+                    disabled={!geminiApiKey.trim() || validatingKey}
+                    title="Tester la clé"
+                  >
+                    {validatingKey ? '⏳' : '✔ Vérifier'}
+                  </button>
                 </div>
+                {keyValidation && (
+                  <div className={`key-validation-result ${keyValidation.valid ? 'valid' : 'invalid'}`}>
+                    {keyValidation.valid ? '✅ Clé valide !' : `❌ ${keyValidation.error}`}
+                    {keyValidation.note && <span> ({keyValidation.note})</span>}
+                  </div>
+                )}
                 <span className="form-help">Gratuit jusqu'à 15 req/min. Stockée dans ~/.bmad/ai-config.json</span>
               </div>
             </div>
@@ -298,14 +329,28 @@ export default function AISettings() {
                   <input
                     type={showKey ? 'text' : 'password'}
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    onChange={(e) => { setApiKey(e.target.value); setKeyValidation(null); }}
                     placeholder="sk-ant-api..."
                     className="form-input"
                   />
                   <button className="btn btn-ghost btn-sm" onClick={() => setShowKey(!showKey)}>
                     {showKey ? '🙈' : '👁️'}
                   </button>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => handleValidateKey('anthropic', apiKey)}
+                    disabled={!apiKey.trim() || validatingKey}
+                    title="Tester la clé"
+                  >
+                    {validatingKey ? '⏳' : '✔ Vérifier'}
+                  </button>
                 </div>
+                {keyValidation && (
+                  <div className={`key-validation-result ${keyValidation.valid ? 'valid' : 'invalid'}`}>
+                    {keyValidation.valid ? '✅ Clé valide !' : `❌ ${keyValidation.error}`}
+                    {keyValidation.note && <span> ({keyValidation.note})</span>}
+                  </div>
+                )}
                 <span className="form-help">Stockée localement dans ~/.bmad/ai-config.json</span>
               </div>
             </div>

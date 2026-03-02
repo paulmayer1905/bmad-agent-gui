@@ -442,6 +442,10 @@ class BMADBackend {
     return await this._aiService.getOllamaStatus();
   }
 
+  async validateApiKey(provider, apiKey) {
+    return await this._aiService.validateApiKey(provider, apiKey);
+  }
+
   // ─── System ─────────────────────────────────────────────────────────────
   async getSystemInfo() {
     return {

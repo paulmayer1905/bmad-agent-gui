@@ -164,6 +164,10 @@ const api = {
       if (isElectron) return window.bmadAPI.ai.ollamaStatus();
       return { available: false, models: [], url: 'http://localhost:11434' };
     },
+    validateKey: async (provider, apiKey) => {
+      if (isElectron) return window.bmadAPI.ai.validateKey(provider, apiKey);
+      return { valid: false, error: 'Non disponible en mode navigateur' };
+    },
   },
 };
 
