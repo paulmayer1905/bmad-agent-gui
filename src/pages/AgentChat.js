@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api';
 
@@ -6,7 +6,7 @@ export default function AgentChat() {
   const { agentName } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  
+
   const [agents, setAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState(agentName || null);
   const [session, setSession] = useState(null);
@@ -15,70 +15,40 @@ export default function AgentChat() {
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState(null);
-  const [aiConfigured, setAiConfigured] = useState(null);
   const [activeChats, setActiveChats] = useState([]);
   const [streamingText, setStreamingText] = useState('');
   const [useStreaming, setUseStreaming] = useState(true);
-  const [providerStatus, setProviderStatus] = useState(null); // { ready, provider, error, models }
-  
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
-  const textareaRef = useRef(null);
+  const [agentsLoaded, setAgentsLoaded] = useState(false);
 
-  // Load agents and check AI config + provider readiness
+  const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
+  const autoStarted = useRef(false);
+
+  // Load agents list (no blocking provider check)
   useEffect(() => {
     const load = async () => {
-      const [agentList, configured, chats, aiConfig] = await Promise.all([
-        api.agents.list(),
-        api.ai.isConfigured(),
-        api.chat.list(),
-        api.ai.getConfig()
-      ]);
-      setAgents(agentList);
-      setAiConfigured(configured);
-      setActiveChats(chats);
-
-      // Check provider readiness
-      const currentProvider = aiConfig.provider || 'ollama';
-      if (currentProvider === 'ollama') {
-        try {
-          const ollamaStatus = await api.ai.ollamaStatus();
-          if (ollamaStatus.available) {
-            setProviderStatus({
-              ready: true,
-              provider: 'ollama',
-              models: ollamaStatus.models || []
-            });
-          } else {
-            setProviderStatus({
-              ready: false,
-              provider: 'ollama',
-              error: 'not_running'
-            });
-          }
-        } catch {
-          setProviderStatus({
-            ready: false,
-            provider: 'ollama',
-            error: 'not_running'
-          });
-        }
-      } else if (currentProvider === 'anthropic') {
-        setProviderStatus({
-          ready: configured,
-          provider: 'anthropic',
-          error: configured ? null : 'no_api_key'
-        });
-      } else if (currentProvider === 'gemini') {
-        setProviderStatus({
-          ready: configured,
-          provider: 'gemini',
-          error: configured ? null : 'no_api_key'
-        });
+      try {
+        const [agentList, chats] = await Promise.all([
+          api.agents.list(),
+          api.chat.list(),
+        ]);
+        setAgents(agentList);
+        setActiveChats(chats);
+      } catch (err) {
+        console.error('AgentChat load error:', err);
       }
+      setAgentsLoaded(true);
     };
     load();
   }, []);
+
+  // Auto-start chat immediately when navigating with an agent name
+  useEffect(() => {
+    if (agentName && agentsLoaded && !session && !starting && !autoStarted.current) {
+      autoStarted.current = true;
+      handleStartChat(agentName);
+    }
+  }, [agentName, agentsLoaded]); // eslint-disable-line
 
   // Setup streaming listeners
   useEffect(() => {
@@ -113,17 +83,10 @@ export default function AgentChat() {
     };
   }, [session]);
 
-  // Auto-scroll  
+  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingText]);
-
-  // Auto-start if agent specified in URL and provider is ready
-  useEffect(() => {
-    if (agentName && providerStatus?.ready && !session && !starting) {
-      handleStartChat(agentName);
-    }
-  }, [agentName, providerStatus]);
 
   const handleStartChat = async (agent) => {
     setStarting(true);
@@ -140,19 +103,19 @@ export default function AgentChat() {
         timestamp: Date.now(),
         usage: result.usage
       }]);
-      // Focus input
       setTimeout(() => textareaRef.current?.focus(), 100);
     } catch (err) {
       const errMsg = err.message || String(err) || 'Erreur inconnue';
       if (errMsg.includes('API_KEY_MISSING')) {
-        setError('Clé API non configurée. Allez dans Paramètres IA pour configurer votre clé.');
-      } else if (errMsg.includes('OLLAMA_CONNECTION_ERROR') || errMsg.includes('ECONNREFUSED') || errMsg.includes('connexion')) {
-        setError('Impossible de se connecter à Ollama. Lancez "ollama serve" dans un terminal, puis réessayez.');
+        setError('no_api_key');
+      } else if (errMsg.includes('OLLAMA_CONNECTION_ERROR') || errMsg.includes('ECONNREFUSED') || errMsg.includes('connexion') || errMsg.includes('fetch failed')) {
+        setError('ollama_not_running');
       } else if (errMsg.includes('GEMINI_ERROR') || errMsg.includes('GEMINI_CONNECTION_ERROR')) {
-        setError('Erreur Gemini : ' + errMsg.replace(/GEMINI_(CONNECTION_)?ERROR:\s*/, ''));
+        setError('gemini_error:' + errMsg.replace(/GEMINI_(CONNECTION_)?ERROR:\s*/, ''));
       } else {
         setError(errMsg);
       }
+      setSelectedAgent(agent);
     } finally {
       setStarting(false);
     }
@@ -164,8 +127,7 @@ export default function AgentChat() {
 
     setInput('');
     setError(null);
-    
-    // Add user message
+
     setMessages(prev => [...prev, {
       role: 'user',
       content: msg,
@@ -210,6 +172,7 @@ export default function AgentChat() {
     setStreamingText('');
     setSelectedAgent(null);
     setError(null);
+    autoStarted.current = false;
   };
 
   const handleResumeChat = async (chat) => {
@@ -229,66 +192,108 @@ export default function AgentChat() {
     setTimeout(() => textareaRef.current?.focus(), 100);
   };
 
-  // ─── Render: Provider not ready ───────────────────────────────────
-  if (providerStatus && !providerStatus.ready) {
+  const handleRetry = () => {
+    setError(null);
+    autoStarted.current = false;
+    if (selectedAgent) {
+      handleStartChat(selectedAgent);
+    }
+  };
+
+  // ─── Render: Error page (connection/config issues) ────────────────
+  if (error && !session) {
+    const agentMeta = agents.find(a => a.name === selectedAgent);
     return (
       <div className="page-container">
         <div className="page-header">
-          <h2>💬 Chat avec un Agent</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="btn btn-ghost" onClick={() => { setError(null); setSelectedAgent(null); autoStarted.current = false; }}>
+              ← Retour
+            </button>
+            <h2>💬 {agentMeta?.icon || '🤖'} {agentMeta?.title || selectedAgent}</h2>
+          </div>
         </div>
         <div className="chat-setup-card">
-          {providerStatus.provider === 'ollama' ? (
+          {error === 'ollama_not_running' ? (
             <>
               <div className="chat-setup-icon">🦙</div>
-              <h3>Ollama n'est pas lancé</h3>
+              <h3>Impossible de se connecter à Ollama</h3>
               <p style={{ marginBottom: 12 }}>
-                Pour discuter avec les agents, Ollama doit être en cours d'exécution sur votre machine.
+                Le fournisseur IA sélectionné (Ollama) n'est pas en cours d'exécution.
               </p>
-              <div style={{ 
-                background: 'var(--bg-card)', 
-                border: '1px solid var(--border)', 
-                borderRadius: 'var(--radius-sm)', 
-                padding: '16px 20px', 
-                marginBottom: 20, 
+              <div style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '16px 20px',
+                marginBottom: 20,
                 textAlign: 'left',
                 fontSize: 14,
                 lineHeight: 1.8
               }}>
-                <strong>📋 Étapes à suivre :</strong><br />
-                1. <strong>Installer Ollama</strong> : téléchargez sur <span style={{ color: 'var(--accent-purple-light)' }}>https://ollama.com</span><br />
-                2. <strong>Lancer Ollama</strong> : ouvrez un terminal et tapez <code style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4 }}>ollama serve</code><br />
-                3. <strong>Télécharger un modèle</strong> : <code style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4 }}>ollama pull llama3.1</code><br />
-                4. Revenez ici et cliquez sur <em>Réessayer</em>
+                <strong>📋 Options :</strong><br />
+                1. <strong>Installer et lancer Ollama</strong> : <span style={{ color: 'var(--accent-purple-light)' }}>https://ollama.com</span> puis <code style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4 }}>ollama serve</code><br />
+                2. Ou <strong>utilisez Gemini</strong> (gratuit) : cliquez sur "Paramètres IA" ci-dessous
               </div>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                <button className="btn btn-primary" onClick={() => window.location.reload()}>
+                <button className="btn btn-primary" onClick={handleRetry}>
                   🔄 Réessayer
                 </button>
                 <button className="btn btn-secondary" onClick={() => navigate('/ai-settings')}>
-                  ⚙️ Changer de provider
+                  ⚙️ Paramètres IA
                 </button>
               </div>
             </>
-          ) : providerStatus.provider === 'gemini' ? (
+          ) : error === 'no_api_key' ? (
+            <>
+              <div className="chat-setup-icon">🔑</div>
+              <h3>Clé API non configurée</h3>
+              <p style={{ marginBottom: 16 }}>
+                Configurez votre clé API pour discuter avec les agents.
+              </p>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="btn btn-primary" onClick={() => navigate('/ai-settings')}>
+                  ⚙️ Configurer la clé API
+                </button>
+                <button className="btn btn-ghost" onClick={handleRetry}>
+                  🔄 Réessayer
+                </button>
+              </div>
+            </>
+          ) : error.startsWith && error.startsWith('gemini_error:') ? (
             <>
               <div className="chat-setup-icon">✨</div>
-              <h3>Clé API Gemini requise</h3>
-              <p>Pour discuter avec les agents via Google Gemini, configurez votre clé API gratuite.</p>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-                Obtenez-la sur <span style={{ color: 'var(--accent-purple-light)' }}>aistudio.google.com/apikey</span>
+              <h3>Erreur Gemini</h3>
+              <p style={{ marginBottom: 16, color: 'var(--accent-red)' }}>
+                {error.replace('gemini_error:', '')}
               </p>
-              <button className="btn btn-primary" onClick={() => navigate('/ai-settings')}>
-                Configurer la clé API Gemini
-              </button>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="btn btn-primary" onClick={() => navigate('/ai-settings')}>
+                  ⚙️ Paramètres IA
+                </button>
+                <button className="btn btn-ghost" onClick={handleRetry}>
+                  🔄 Réessayer
+                </button>
+              </div>
             </>
           ) : (
             <>
-              <div className="chat-setup-icon">🔑</div>
-              <h3>Configuration requise</h3>
-              <p>Pour discuter avec les agents BMAD via Anthropic, configurez votre clé API.</p>
-              <button className="btn btn-primary" onClick={() => navigate('/ai-settings')}>
-                Configurer la clé API
-              </button>
+              <div className="chat-setup-icon">⚠️</div>
+              <h3>Erreur de connexion</h3>
+              <p style={{ marginBottom: 16, color: 'var(--accent-red)' }}>
+                {error}
+              </p>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="btn btn-primary" onClick={handleRetry}>
+                  🔄 Réessayer
+                </button>
+                <button className="btn btn-secondary" onClick={() => navigate('/ai-settings')}>
+                  ⚙️ Paramètres IA
+                </button>
+                <button className="btn btn-ghost" onClick={() => navigate('/')}>
+                  🏠 Accueil
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -296,19 +301,20 @@ export default function AgentChat() {
     );
   }
 
-  // ─── Render: Loading provider status ────────────────────────────────
-  if (!providerStatus) {
+  // ─── Render: Starting chat ──────────────────────────────────────────
+  if (starting) {
+    const agentMeta = agents.find(a => a.name === (selectedAgent || agentName));
     return (
       <div className="page-container">
         <div className="chat-loading">
           <div className="chat-loading-spinner"></div>
-          <p>Vérification de la connexion...</p>
+          <p>Connexion à {agentMeta?.icon || '🤖'} {agentMeta?.title || selectedAgent || agentName}...</p>
         </div>
       </div>
     );
   }
 
-  // ─── Render: Agent selection ────────────────────────────────────────
+  // ─── Render: Agent selection (no agent specified) ───────────────────
   if (!session && !starting) {
     return (
       <div className="page-container">
@@ -348,33 +354,28 @@ export default function AgentChat() {
         )}
 
         {/* Agent selection grid */}
-        <div className="chat-agents-grid">
-          {agents.map(agent => (
-            <div
-              key={agent.name}
-              className="chat-agent-card"
-              onClick={() => handleStartChat(agent.name)}
-            >
-              <div className="chat-agent-icon">{agent.icon || '🤖'}</div>
-              <div className="chat-agent-info">
-                <h4>{agent.title || agent.name}</h4>
-                <p>{agent.whenToUse || ''}</p>
+        {!agentsLoaded ? (
+          <div className="chat-loading">
+            <div className="chat-loading-spinner"></div>
+            <p>Chargement des agents...</p>
+          </div>
+        ) : (
+          <div className="chat-agents-grid">
+            {agents.map(agent => (
+              <div
+                key={agent.name}
+                className="chat-agent-card"
+                onClick={() => handleStartChat(agent.name)}
+              >
+                <div className="chat-agent-icon">{agent.icon || '🤖'}</div>
+                <div className="chat-agent-info">
+                  <h4>{agent.title || agent.name}</h4>
+                  <p>{agent.whenToUse || ''}</p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Render: Starting ───────────────────────────────────────────────
-  if (starting) {
-    return (
-      <div className="page-container">
-        <div className="chat-loading">
-          <div className="chat-loading-spinner"></div>
-          <p>Connexion à l'agent {agents.find(a => a.name === selectedAgent)?.title || selectedAgent}...</p>
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -496,7 +497,7 @@ export default function AgentChat() {
           </button>
         </div>
         <div className="chat-input-hint">
-          Entrée pour envoyer · Shift+Entrée pour un retour à la ligne · Utilisez *help pour voir les commandes
+          Entrée pour envoyer · Shift+Entrée pour un retour à la ligne
         </div>
       </div>
     </div>
