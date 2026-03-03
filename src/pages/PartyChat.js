@@ -24,8 +24,41 @@ function getAgentColor(name) {
 const TABS = {
   PARTY: 'party',
   PIPELINES: 'pipelines',
+  WORKSPACE: 'workspace',
   CONTEXT: 'context',
 };
+
+// ─── FileTreeView component ───────────────────────────────────────────
+function FileTreeView({ items, onSelect, selectedPath, depth = 0 }) {
+  const [expanded, setExpanded] = React.useState({});
+
+  const toggle = (path) => setExpanded(prev => ({ ...prev, [path]: !prev[path] }));
+
+  return (
+    <div className="file-tree-level">
+      {items.map(item => (
+        <div key={item.path}>
+          <div
+            className={`file-tree-node ${selectedPath === item.path ? 'file-tree-selected' : ''}`}
+            style={{ paddingLeft: `${depth * 16 + 8}px` }}
+            onClick={() => {
+              if (item.type === 'dir') toggle(item.path);
+              else onSelect(item);
+            }}
+          >
+            <span className="file-tree-icon">
+              {item.type === 'dir' ? (expanded[item.path] ? '📂' : '📁') : '📄'}
+            </span>
+            <span className="file-tree-name">{item.name}</span>
+          </div>
+          {item.type === 'dir' && expanded[item.path] && item.children && (
+            <FileTreeView items={item.children} onSelect={onSelect} selectedPath={selectedPath} depth={depth + 1} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function PartyChat() {
   const navigate = useNavigate();
@@ -58,6 +91,16 @@ export default function PartyChat() {
   const [decisions, setDecisions] = useState([]);
   const [expandedArtifact, setExpandedArtifact] = useState(null);
 
+  // ─── State: workspace ──────────────────────────────────────────────
+  const [workspaces, setWorkspaces] = useState([]);
+  const [activeWorkspace, setActiveWorkspace] = useState(null);
+  const [fileTree, setFileTree] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileContent, setFileContent] = useState('');
+  const [commandOutput, setCommandOutput] = useState(null);
+  const [commandRunning, setCommandRunning] = useState(false);
+  const [wsCommands, setWsCommands] = useState({ install: null, dev: null, build: null, start: null });
+
   // ─── Load agents + templates ─────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
@@ -79,6 +122,9 @@ export default function PartyChat() {
   useEffect(() => {
     if (activeTab === TABS.CONTEXT) {
       refreshContext();
+    }
+    if (activeTab === TABS.WORKSPACE) {
+      refreshWorkspaces();
     }
   }, [activeTab]);
 
@@ -104,10 +150,16 @@ export default function PartyChat() {
         i === data.stepIndex ? { ...s, status: 'failed', error: data.error } : s
       ));
     });
+    const cleanupFiles = api.workspace.onFilesWritten((data) => {
+      setPipelineSteps(prev => prev.map((s, i) =>
+        i === data.stepIndex ? { ...s, filesWritten: data.files.length } : s
+      ));
+    });
     return () => {
       if (cleanupStart) cleanupStart();
       if (cleanupDone) cleanupDone();
       if (cleanupError) cleanupError();
+      if (cleanupFiles) cleanupFiles();
     };
   }, []);
 
@@ -214,14 +266,25 @@ export default function PartyChat() {
       index: i,
       status: 'pending',
       response: null,
-      error: null
+      error: null,
+      filesWritten: 0
     })));
 
     try {
+      // If template requires workspace, create one
+      let workspaceId = null;
+      if (template.requiresWorkspace || template.steps.some(s => s.extractCode)) {
+        const wsName = pipelineInput.trim().slice(0, 40).replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '-') || 'new-project';
+        const ws = await api.workspace.create({ name: wsName, description: pipelineInput.trim() });
+        workspaceId = ws.id;
+        setActiveWorkspace(ws);
+      }
+
       const pipeline = {
         name: template.name,
         steps: template.steps,
-        initialInput: pipelineInput.trim()
+        initialInput: pipelineInput.trim(),
+        workspaceId
       };
       const result = await api.coord.executePipeline(pipeline, { continueOnError: true });
 
@@ -230,7 +293,17 @@ export default function PartyChat() {
         ...s,
         response: s.result?.response?.slice(0, 500) || null
       })));
-      setActivePipeline(prev => ({ ...prev, status: result.status }));
+      setActivePipeline(prev => ({ ...prev, status: result.status, workspaceId }));
+
+      // Auto-detect commands if workspace was created
+      if (workspaceId) {
+        try {
+          const cmds = await api.workspace.detectCommands(workspaceId);
+          setWsCommands(cmds);
+          const ws = await api.workspace.get(workspaceId);
+          setActiveWorkspace(ws);
+        } catch { /* ignore */ }
+      }
     } catch (err) {
       setError(err.message || 'Erreur pipeline');
     } finally {
@@ -271,6 +344,78 @@ export default function PartyChat() {
     refreshContext();
   };
 
+  // ─── Workspace handlers ──────────────────────────────────────────────
+
+  const refreshWorkspaces = async () => {
+    try {
+      const list = await api.workspace.list();
+      setWorkspaces(list);
+    } catch (err) {
+      console.error('Workspace refresh error:', err);
+    }
+  };
+
+  const handleSelectWorkspace = async (ws) => {
+    try {
+      const full = await api.workspace.get(ws.id);
+      setActiveWorkspace(full);
+      const tree = await api.workspace.fileTree(ws.id);
+      setFileTree(tree);
+      setSelectedFile(null);
+      setFileContent('');
+      const cmds = await api.workspace.detectCommands(ws.id);
+      setWsCommands(cmds);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleSelectFile = async (file) => {
+    if (file.type === 'dir') return;
+    try {
+      const result = await api.workspace.readFile(activeWorkspace.id, file.path);
+      setSelectedFile(file);
+      setFileContent(result.content);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleRunCommand = async (command) => {
+    if (!activeWorkspace || commandRunning) return;
+    setCommandRunning(true);
+    setCommandOutput(null);
+    try {
+      const result = await api.workspace.runCommand(activeWorkspace.id, command);
+      setCommandOutput(result);
+      // Refresh file tree after commands (npm install may create files)
+      const tree = await api.workspace.fileTree(activeWorkspace.id);
+      setFileTree(tree);
+      // Re-detect commands
+      const cmds = await api.workspace.detectCommands(activeWorkspace.id);
+      setWsCommands(cmds);
+    } catch (err) {
+      setCommandOutput({ stdout: '', stderr: err.message, exitCode: 1 });
+    } finally {
+      setCommandRunning(false);
+    }
+  };
+
+  const handleOpenFolder = async () => {
+    if (!activeWorkspace) return;
+    await api.workspace.openFolder(activeWorkspace.id);
+  };
+
+  const handleDeleteWorkspace = async (id) => {
+    await api.workspace.delete(id);
+    if (activeWorkspace?.id === id) {
+      setActiveWorkspace(null);
+      setFileTree([]);
+      setSelectedFile(null);
+    }
+    refreshWorkspaces();
+  };
+
   // ─── Render: Tab Header ──────────────────────────────────────────────
 
   return (
@@ -287,6 +432,12 @@ export default function PartyChat() {
           onClick={() => setActiveTab(TABS.PIPELINES)}
         >
           🔗 Pipelines
+        </button>
+        <button
+          className={`party-tab ${activeTab === TABS.WORKSPACE ? 'active' : ''}`}
+          onClick={() => setActiveTab(TABS.WORKSPACE)}
+        >
+          📁 Projets
         </button>
         <button
           className={`party-tab ${activeTab === TABS.CONTEXT ? 'active' : ''}`}
@@ -523,6 +674,11 @@ export default function PartyChat() {
                           {step.response.length >= 500 && '...'}
                         </div>
                       )}
+                      {step.filesWritten > 0 && (
+                        <div className="pipeline-step-files">
+                          📁 {step.filesWritten} fichier{step.filesWritten > 1 ? 's' : ''} généré{step.filesWritten > 1 ? 's' : ''} dans le workspace
+                        </div>
+                      )}
                       {step.error && <div className="pipeline-step-error">❌ {step.error}</div>}
                     </div>
                   );
@@ -532,15 +688,164 @@ export default function PartyChat() {
               {pipelineSteps.every(s => s.status === 'completed' || s.status === 'failed') && (
                 <div style={{ marginTop: '16px', textAlign: 'center' }}>
                   <p style={{ color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                    Pipeline terminé — les résultats sont sauvegardés dans le contexte partagé
+                    Pipeline terminé — les résultats sont sauvegardés
+                    {activePipeline.workspaceId && ' et les fichiers sont dans le workspace'}
                   </p>
-                  <button className="btn btn-primary" onClick={() => { setActiveTab(TABS.CONTEXT); refreshContext(); }}>
-                    📦 Voir le contexte partagé
-                  </button>
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                    {activePipeline.workspaceId && (
+                      <button className="btn btn-primary" onClick={() => {
+                        setActiveTab(TABS.WORKSPACE);
+                        if (activeWorkspace) handleSelectWorkspace(activeWorkspace);
+                      }}>
+                        📁 Voir le projet
+                      </button>
+                    )}
+                    <button className="btn btn-ghost" onClick={() => { setActiveTab(TABS.CONTEXT); refreshContext(); }}>
+                      📦 Voir le contexte
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ═══ TAB: Workspace ═══ */}
+      {activeTab === TABS.WORKSPACE && (
+        <div className="party-content" style={{ display: 'flex', height: '100%' }}>
+          {/* Sidebar: workspace list */}
+          <div className="ws-sidebar">
+            <div className="ws-sidebar-header">
+              <h3>📁 Projets</h3>
+            </div>
+            {workspaces.length === 0 ? (
+              <div className="ws-empty-hint">
+                Lancez un pipeline avec génération de code pour créer un projet.
+              </div>
+            ) : (
+              <div className="ws-list">
+                {workspaces.map(ws => (
+                  <div
+                    key={ws.id}
+                    className={`ws-item ${activeWorkspace?.id === ws.id ? 'ws-item-active' : ''}`}
+                    onClick={() => handleSelectWorkspace(ws)}
+                  >
+                    <div className="ws-item-name">📂 {ws.name}</div>
+                    <div className="ws-item-meta">
+                      {ws.fileCount} fichier{ws.fileCount !== 1 ? 's' : ''} · {new Date(ws.updatedAt).toLocaleDateString()}
+                    </div>
+                    <button className="btn btn-ghost btn-xs ws-delete-btn" onClick={(e) => { e.stopPropagation(); handleDeleteWorkspace(ws.id); }}>🗑️</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Main area */}
+          <div className="ws-main">
+            {!activeWorkspace ? (
+              <div className="empty-state">
+                <div className="empty-icon">📁</div>
+                <h3>Aucun projet sélectionné</h3>
+                <p>Sélectionnez un projet dans la liste ou lancez le pipeline "🚀 Développement complet" pour en créer un.</p>
+              </div>
+            ) : (
+              <>
+                {/* Header */}
+                <div className="ws-header">
+                  <div>
+                    <h2 style={{ margin: 0 }}>{activeWorkspace.name}</h2>
+                    <div className="ws-path">{activeWorkspace.path}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn btn-ghost btn-sm" onClick={handleOpenFolder}>📂 Ouvrir</button>
+                  </div>
+                </div>
+
+                {/* Commands bar */}
+                <div className="ws-commands">
+                  {wsCommands.install && (
+                    <button
+                      className="btn btn-sm ws-cmd-btn"
+                      disabled={commandRunning}
+                      onClick={() => handleRunCommand(wsCommands.install)}
+                    >
+                      📦 {wsCommands.install}
+                    </button>
+                  )}
+                  {wsCommands.dev && (
+                    <button
+                      className="btn btn-sm ws-cmd-btn"
+                      disabled={commandRunning}
+                      onClick={() => handleRunCommand(wsCommands.dev)}
+                    >
+                      ▶ {wsCommands.dev}
+                    </button>
+                  )}
+                  {wsCommands.build && (
+                    <button
+                      className="btn btn-sm ws-cmd-btn"
+                      disabled={commandRunning}
+                      onClick={() => handleRunCommand(wsCommands.build)}
+                    >
+                      🔨 {wsCommands.build}
+                    </button>
+                  )}
+                  {wsCommands.start && wsCommands.start !== wsCommands.dev && (
+                    <button
+                      className="btn btn-sm ws-cmd-btn"
+                      disabled={commandRunning}
+                      onClick={() => handleRunCommand(wsCommands.start)}
+                    >
+                      🚀 {wsCommands.start}
+                    </button>
+                  )}
+                  {commandRunning && <span className="ws-cmd-running">⏳ Exécution en cours...</span>}
+                </div>
+
+                {/* Command output */}
+                {commandOutput && (
+                  <div className={`ws-command-output ${commandOutput.exitCode === 0 ? 'ws-cmd-success' : 'ws-cmd-error'}`}>
+                    <div className="ws-cmd-header">
+                      {commandOutput.exitCode === 0 ? '✅ Succès' : `❌ Erreur (code ${commandOutput.exitCode})`}
+                      <button className="btn btn-ghost btn-xs" onClick={() => setCommandOutput(null)}>✕</button>
+                    </div>
+                    {commandOutput.stdout && <pre className="ws-cmd-output">{commandOutput.stdout.slice(-2000)}</pre>}
+                    {commandOutput.stderr && <pre className="ws-cmd-output ws-cmd-stderr">{commandOutput.stderr.slice(-1000)}</pre>}
+                  </div>
+                )}
+
+                {/* File explorer + viewer */}
+                <div className="ws-content">
+                  {/* File tree */}
+                  <div className="ws-file-tree">
+                    <div className="ws-tree-header">Fichiers ({activeWorkspace.files?.length || 0})</div>
+                    {fileTree.length === 0 ? (
+                      <div className="ws-empty-hint">Aucun fichier</div>
+                    ) : (
+                      <FileTreeView items={fileTree} onSelect={handleSelectFile} selectedPath={selectedFile?.path} />
+                    )}
+                  </div>
+
+                  {/* File viewer */}
+                  <div className="ws-file-viewer">
+                    {selectedFile ? (
+                      <>
+                        <div className="ws-viewer-header">
+                          <span className="ws-viewer-filename">{selectedFile.path}</span>
+                          <span className="ws-viewer-size">{(selectedFile.size / 1024).toFixed(1)} KB</span>
+                        </div>
+                        <pre className="ws-viewer-code"><code>{fileContent}</code></pre>
+                      </>
+                    ) : (
+                      <div className="ws-viewer-empty">Sélectionnez un fichier pour voir son contenu</div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 

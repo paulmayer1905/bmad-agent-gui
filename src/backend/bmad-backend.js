@@ -10,6 +10,7 @@ const yaml = require('js-yaml');
 const AIService = require('./ai-service');
 const ProjectContext = require('./project-context');
 const AgentCoordinator = require('./agent-coordinator');
+const WorkspaceManager = require('./workspace-manager');
 
 class BMADBackend {
   constructor(options = {}) {
@@ -31,6 +32,9 @@ class BMADBackend {
 
     // Project context (shared memory)
     this._projectContext = new ProjectContext({ basePath: this.basePath });
+
+    // Workspace manager (real project files on disk)
+    this._workspaceManager = new WorkspaceManager();
 
     // Agent coordinator (delegation, pipeline, party mode)
     this._coordinator = null; // initialized after aiService
@@ -66,11 +70,15 @@ class BMADBackend {
     await this._projectContext.initialize();
     this._aiService.projectContext = this._projectContext;
 
+    // Initialize workspace manager
+    await this._workspaceManager.initialize();
+
     // Initialize coordinator (delegation, pipeline, party mode)
     this._coordinator = new AgentCoordinator({
       aiService: this._aiService,
       projectContext: this._projectContext,
-      bmadBackend: this
+      bmadBackend: this,
+      workspaceManager: this._workspaceManager
     });
   }
 
@@ -561,6 +569,60 @@ class BMADBackend {
 
   getCoordinator() {
     return this._coordinator;
+  }
+
+  // ─── Workspace Manager ──────────────────────────────────────────────
+
+  async createWorkspace(options) {
+    return await this._workspaceManager.createWorkspace(options);
+  }
+
+  getWorkspace(id) {
+    return this._workspaceManager.getWorkspace(id);
+  }
+
+  listWorkspaces() {
+    return this._workspaceManager.listWorkspaces();
+  }
+
+  async deleteWorkspace(id) {
+    return await this._workspaceManager.deleteWorkspace(id);
+  }
+
+  async getFileTree(workspaceId) {
+    return await this._workspaceManager.getFileTree(workspaceId);
+  }
+
+  async readWorkspaceFile(workspaceId, filePath) {
+    return await this._workspaceManager.readFile(workspaceId, filePath);
+  }
+
+  async writeWorkspaceFile(workspaceId, filePath, content, options) {
+    return await this._workspaceManager.writeFile(workspaceId, filePath, content, options);
+  }
+
+  runWorkspaceCommand(workspaceId, command, options) {
+    return this._workspaceManager.runCommandSync(workspaceId, command, options);
+  }
+
+  runWorkspaceCommandBackground(workspaceId, command, options) {
+    return this._workspaceManager.runCommandBackground(workspaceId, command, options);
+  }
+
+  getProcessOutput(workspaceId, processId) {
+    return this._workspaceManager.getProcessOutput(workspaceId, processId);
+  }
+
+  killProcess(workspaceId, processId) {
+    return this._workspaceManager.killProcess(workspaceId, processId);
+  }
+
+  async detectSetupCommands(workspaceId) {
+    return await this._workspaceManager.detectSetupCommands(workspaceId);
+  }
+
+  getWorkspacePath(id) {
+    return this._workspaceManager.getWorkspacePath(id);
   }
 
   // ─── System ─────────────────────────────────────────────────────────────

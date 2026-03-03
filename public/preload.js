@@ -134,6 +134,28 @@ contextBridge.exposeInMainWorld('bmadAPI', {
     listPartySessions: () => ipcRenderer.invoke('coord:party:list'),
   },
 
+  // Workspace Manager
+  workspace: {
+    create: (options) => ipcRenderer.invoke('workspace:create', options),
+    get: (id) => ipcRenderer.invoke('workspace:get', id),
+    list: () => ipcRenderer.invoke('workspace:list'),
+    delete: (id) => ipcRenderer.invoke('workspace:delete', id),
+    fileTree: (id) => ipcRenderer.invoke('workspace:fileTree', id),
+    readFile: (id, filePath) => ipcRenderer.invoke('workspace:readFile', id, filePath),
+    writeFile: (id, filePath, content, options) => ipcRenderer.invoke('workspace:writeFile', id, filePath, content, options),
+    runCommand: (id, command, options) => ipcRenderer.invoke('workspace:runCommand', id, command, options),
+    runCommandBg: (id, command, options) => ipcRenderer.invoke('workspace:runCommandBg', id, command, options),
+    processOutput: (wsId, procId) => ipcRenderer.invoke('workspace:processOutput', wsId, procId),
+    killProcess: (wsId, procId) => ipcRenderer.invoke('workspace:killProcess', wsId, procId),
+    detectCommands: (id) => ipcRenderer.invoke('workspace:detectCommands', id),
+    getPath: (id) => ipcRenderer.invoke('workspace:getPath', id),
+    openFolder: (id) => ipcRenderer.invoke('workspace:openFolder', id),
+    onFilesWritten: (callback) => {
+      ipcRenderer.on('pipeline:files:written', (_, data) => callback(data));
+      return () => ipcRenderer.removeAllListeners('pipeline:files:written');
+    },
+  },
+
   // Navigation events from menu
   onNavigate: (callback) => {
     ipcRenderer.on('navigate', (_, path) => callback(path));

@@ -6,12 +6,97 @@
 const crypto = require('crypto');
 const EventEmitter = require('events');
 
+// ─── Instruction templates for code-generating pipeline steps ────────────
+
+const CODE_GEN_INSTRUCTIONS = `Implémente le CODE COMPLET et FONCTIONNEL pour cette tâche.
+
+RÈGLES CRITIQUES :
+1. Produis CHAQUE FICHIER avec son chemin complet en utilisant ce format exact :
+
+\`\`\`filename:chemin/vers/fichier.ext
+// code complet ici
+\`\`\`
+
+2. Chaque fichier doit être COMPLET — pas de placeholders, pas de "// TODO", pas de "...existing code..."
+3. Inclus TOUS les fichiers nécessaires : code source, config, package.json, README.md
+4. Le code doit compiler et fonctionner directement sans modification
+5. Utilise les bonnes pratiques et une architecture propre
+6. Inclus les dépendances dans package.json (ou requirements.txt pour Python)`;
+
+const FULL_APP_CODE_INSTRUCTIONS = `Tu dois générer le CODE SOURCE COMPLET d'une application fonctionnelle.
+Basé sur l'architecture, le design UX, et l'analyse précédents, produis TOUS les fichiers nécessaires.
+
+RÈGLES CRITIQUES :
+1. Utilise ce format pour CHAQUE FICHIER :
+
+\`\`\`filename:chemin/vers/fichier.ext
+// code complet ici
+\`\`\`
+
+2. Commence par package.json (ou l'équivalent pour le langage choisi) avec TOUTES les dépendances
+3. Produis CHAQUE fichier en entier — aucun placeholder, aucun "TODO", aucun raccourci
+4. L'application doit pouvoir démarrer avec "npm install && npm start" (ou équivalent)
+5. Inclus : index.html, CSS, tous les composants/modules JS, fichiers de config
+6. Si c'est une app web : inclus un serveur simple ou utilise une structure SPA
+7. Si c'est une app desktop : configure Electron avec main.js et preload.js
+8. Ajoute un README.md avec les instructions d'installation et de lancement
+9. Le design doit correspondre aux wireframes UX fournis
+10. Utilise un style CSS moderne et responsive`;
+
+const ARCHITECT_INSTRUCTIONS = `Conçois l'architecture technique complète de l'application.
+
+Tu DOIS fournir :
+1. Le choix de la stack technique avec justification (framework, langage, dépendances)
+2. La structure EXACTE des fichiers du projet sous forme d'arbre, par exemple :
+   mon-app/
+   ├── package.json
+   ├── src/
+   │   ├── index.js
+   │   ├── components/
+   │   └── styles/
+   └── public/
+       └── index.html
+3. La description de chaque module/composant principal
+4. Les dépendances npm/pip exactes à installer
+5. Les commandes pour installer et lancer l'application
+6. Si l'application est destinée au bureau : recommande Electron
+7. Si c'est une webapp : recommande un serveur léger ou une SPA statique`;
+
+const QA_TEST_INSTRUCTIONS = `Écris les tests COMPLETS pour l'application.
+
+RÈGLES :
+1. Produis de vrais fichiers de test avec ce format :
+
+\`\`\`filename:tests/nom-du-test.test.js
+// code de test complet
+\`\`\`
+
+2. Couvre les cas principaux, les cas limites, et les erreurs
+3. Si c'est du JS : utilise Jest ou le framework de test du projet
+4. Les tests doivent être exécutables avec "npm test" ou équivalent
+5. Inclus aussi des suggestions de tests manuels si pertinent`;
+
+const FIX_AND_FINALIZE_INSTRUCTIONS = `Revois le code généré et les retours du QA.
+
+1. Corrige tous les problèmes identifiés par le QA
+2. Assure-toi que tous les fichiers sont cohérents entre eux
+3. Vérifie les imports/requires et les chemins
+4. Ajoute les fichiers manquants s'il y en a
+5. Produis les fichiers corrigés au format :
+
+\`\`\`filename:chemin/vers/fichier.ext
+// code corrigé complet
+\`\`\`
+
+6. Produis un README.md final avec les instructions de démarrage complètes`;
+
 class AgentCoordinator extends EventEmitter {
   constructor(options = {}) {
     super();
     this.aiService = options.aiService;
     this.projectContext = options.projectContext;
     this.bmadBackend = options.bmadBackend;
+    this.workspaceManager = options.workspaceManager || null;
 
     // Active party sessions
     this.partySessions = new Map();
@@ -107,6 +192,7 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
     const state = {
       id: pipelineId,
       name: pipeline.name || 'Pipeline personnalisé',
+      workspaceId: pipeline.workspaceId || null,
       steps: pipeline.steps.map((s, i) => ({
         ...s,
         index: i,
@@ -156,10 +242,27 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
           state.results.push(result);
           previousOutput = result.response;
 
+          // Extract code blocks and write to workspace if step has extractCode
+          let filesWritten = [];
+          if (step.extractCode && state.workspaceId && this.workspaceManager) {
+            try {
+              const writeResult = await this.workspaceManager.writeCodeBlocks(
+                state.workspaceId, result.response, { agent: step.agent }
+              );
+              filesWritten = writeResult.written;
+              this.emit('pipeline:files:written', {
+                pipelineId, stepIndex: i, files: filesWritten
+              });
+            } catch (err) {
+              console.error('Code extraction error:', err.message);
+            }
+          }
+
           this.emit('pipeline:step:done', {
             pipelineId, stepIndex: i, agentName: step.agent,
             response: result.response.slice(0, 300),
-            usage: result.usage
+            usage: result.usage,
+            filesWritten: filesWritten.length
           });
 
         } catch (err) {
@@ -275,11 +378,25 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
       {
         id: 'story-to-implementation',
         name: 'Story → Dev → QA',
-        description: 'Le PM écrit la story, le Dev implémente, le QA valide',
+        description: 'Le PM écrit la story, le Dev implémente du vrai code, le QA valide',
         steps: [
           { agent: 'pm', task: 'Rédaction user story', instructions: 'Rédige une user story détaillée avec critères d\'acceptation.', artifactType: 'story', saveArtifact: true },
-          { agent: 'dev', task: 'Plan d\'implémentation', instructions: 'Décris le plan d\'implémentation technique avec le code nécessaire.', artifactType: 'code', saveArtifact: true },
-          { agent: 'qa', task: 'Plan de test', instructions: 'Rédige le plan de test complet incluant cas limites et scénarios d\'erreur.', artifactType: 'test', saveArtifact: true }
+          { agent: 'dev', task: 'Implémentation du code', instructions: CODE_GEN_INSTRUCTIONS, artifactType: 'code', saveArtifact: true, extractCode: true },
+          { agent: 'qa', task: 'Tests et validation', instructions: QA_TEST_INSTRUCTIONS, artifactType: 'test', saveArtifact: true, extractCode: true }
+        ]
+      },
+      {
+        id: 'full-app-development',
+        name: '🚀 Développement complet d\'application',
+        description: 'L\'équipe complète conçoit et génère une application fonctionnelle installable',
+        requiresWorkspace: true,
+        steps: [
+          { agent: 'analyst', task: 'Analyse des besoins et faisabilité', instructions: 'Analyse le besoin décrit. Identifie les fonctionnalités clés, les utilisateurs cibles, et les contraintes techniques. Recommande si l\'application devrait être : (a) une webapp (HTML/CSS/JS), (b) une application desktop (Electron), (c) une API/backend (Node.js/Python), ou (d) une application fullstack. Justifie ton choix.', artifactType: 'analysis', saveArtifact: true },
+          { agent: 'architect', task: 'Architecture technique et structure fichiers', instructions: ARCHITECT_INSTRUCTIONS, artifactType: 'architecture', saveArtifact: true },
+          { agent: 'ux-expert', task: 'Design UX/UI', instructions: 'Basé sur l\'analyse et l\'architecture, conçois le design UX/UI. Produis des wireframes SVG détaillés pour chaque écran principal. Décris la navigation, la palette de couleurs, et les composants UI.', artifactType: 'design', saveArtifact: true },
+          { agent: 'dev', task: 'Génération du code complet', instructions: FULL_APP_CODE_INSTRUCTIONS, artifactType: 'code', saveArtifact: true, extractCode: true },
+          { agent: 'qa', task: 'Tests et validation', instructions: QA_TEST_INSTRUCTIONS, artifactType: 'test', saveArtifact: true, extractCode: true },
+          { agent: 'dev', task: 'Corrections et finalisation', instructions: FIX_AND_FINALIZE_INSTRUCTIONS, artifactType: 'code', saveArtifact: true, extractCode: true }
         ]
       },
       {

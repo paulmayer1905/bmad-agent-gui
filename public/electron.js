@@ -231,10 +231,14 @@ function registerIpcHandlers() {
     const onStepError = (data) => {
       if (!mainWindow.isDestroyed()) mainWindow.webContents.send('pipeline:step:error', data);
     };
+    const onFilesWritten = (data) => {
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('pipeline:files:written', data);
+    };
 
     coordinator.on('pipeline:step:start', onStepStart);
     coordinator.on('pipeline:step:done', onStepDone);
     coordinator.on('pipeline:step:error', onStepError);
+    coordinator.on('pipeline:files:written', onFilesWritten);
 
     try {
       const result = await backend.executePipeline(pipeline, options);
@@ -243,6 +247,7 @@ function registerIpcHandlers() {
       coordinator.removeListener('pipeline:step:start', onStepStart);
       coordinator.removeListener('pipeline:step:done', onStepDone);
       coordinator.removeListener('pipeline:step:error', onStepError);
+      coordinator.removeListener('pipeline:files:written', onFilesWritten);
     }
   });
 
@@ -252,6 +257,30 @@ function registerIpcHandlers() {
   safeHandle('coord:party:get', (_, partyId) => backend.getPartySession(partyId));
   safeHandle('coord:party:end', (_, partyId) => backend.endParty(partyId));
   safeHandle('coord:party:list', () => backend.listPartySessions());
+
+  // ─── Workspace Manager ────────────────────────────────────────────────
+  safeHandle('workspace:create', (_, options) => backend.createWorkspace(options));
+  safeHandle('workspace:get', (_, id) => backend.getWorkspace(id));
+  safeHandle('workspace:list', () => backend.listWorkspaces());
+  safeHandle('workspace:delete', (_, id) => backend.deleteWorkspace(id));
+  safeHandle('workspace:fileTree', (_, id) => backend.getFileTree(id));
+  safeHandle('workspace:readFile', (_, id, filePath) => backend.readWorkspaceFile(id, filePath));
+  safeHandle('workspace:writeFile', (_, id, filePath, content, options) => backend.writeWorkspaceFile(id, filePath, content, options));
+  safeHandle('workspace:runCommand', (_, id, command, options) => backend.runWorkspaceCommand(id, command, options));
+  safeHandle('workspace:runCommandBg', (_, id, command, options) => backend.runWorkspaceCommandBackground(id, command, options));
+  safeHandle('workspace:processOutput', (_, wsId, procId) => backend.getProcessOutput(wsId, procId));
+  safeHandle('workspace:killProcess', (_, wsId, procId) => backend.killProcess(wsId, procId));
+  safeHandle('workspace:detectCommands', (_, id) => backend.detectSetupCommands(id));
+  safeHandle('workspace:getPath', (_, id) => backend.getWorkspacePath(id));
+  safeHandle('workspace:openFolder', async (_, id) => {
+    const wsPath = backend.getWorkspacePath(id);
+    if (wsPath) {
+      const { shell } = require('electron');
+      await shell.openPath(wsPath);
+      return { success: true };
+    }
+    return { success: false };
+  });
 
   // Streaming chat (uses IPC events instead of invoke)
   ipcMain.on('chat:stream', async (event, sessionId, message) => {

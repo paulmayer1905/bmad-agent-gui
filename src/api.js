@@ -285,6 +285,70 @@ const api = {
       return [];
     },
   },
+
+  // Workspace Manager
+  workspace: {
+    create: async (options) => {
+      if (isElectron) return window.bmadAPI.workspace.create(options);
+      return { id: 'mock-ws', name: options?.name || 'mock', path: '/mock', files: [], status: 'created' };
+    },
+    get: async (id) => {
+      if (isElectron) return window.bmadAPI.workspace.get(id);
+      return null;
+    },
+    list: async () => {
+      if (isElectron) return window.bmadAPI.workspace.list();
+      return [];
+    },
+    delete: async (id) => {
+      if (isElectron) return window.bmadAPI.workspace.delete(id);
+      return { success: true };
+    },
+    fileTree: async (id) => {
+      if (isElectron) return window.bmadAPI.workspace.fileTree(id);
+      return [];
+    },
+    readFile: async (id, filePath) => {
+      if (isElectron) return window.bmadAPI.workspace.readFile(id, filePath);
+      return { path: filePath, content: '' };
+    },
+    writeFile: async (id, filePath, content, options) => {
+      if (isElectron) return window.bmadAPI.workspace.writeFile(id, filePath, content, options);
+      return { path: filePath, size: 0 };
+    },
+    runCommand: async (id, command, options) => {
+      if (isElectron) return window.bmadAPI.workspace.runCommand(id, command, options);
+      return { stdout: '[mock]', stderr: '', exitCode: 0 };
+    },
+    runCommandBg: async (id, command, options) => {
+      if (isElectron) return window.bmadAPI.workspace.runCommandBg(id, command, options);
+      return { processId: 'mock', pid: 0 };
+    },
+    processOutput: async (wsId, procId) => {
+      if (isElectron) return window.bmadAPI.workspace.processOutput(wsId, procId);
+      return null;
+    },
+    killProcess: async (wsId, procId) => {
+      if (isElectron) return window.bmadAPI.workspace.killProcess(wsId, procId);
+      return false;
+    },
+    detectCommands: async (id) => {
+      if (isElectron) return window.bmadAPI.workspace.detectCommands(id);
+      return { install: null, dev: null, build: null, start: null };
+    },
+    getPath: async (id) => {
+      if (isElectron) return window.bmadAPI.workspace.getPath(id);
+      return null;
+    },
+    openFolder: async (id) => {
+      if (isElectron) return window.bmadAPI.workspace.openFolder(id);
+      return { success: false };
+    },
+    onFilesWritten: (callback) => {
+      if (isElectron) return window.bmadAPI.workspace.onFilesWritten(callback);
+      return () => {};
+    },
+  },
 };
 
 export default api;
