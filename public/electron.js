@@ -52,20 +52,20 @@ function createWindow() {
     {
       label: 'BMAD',
       submenu: [
-        { label: 'About BMAD Agent GUI', role: 'about' },
+        { label: 'À propos de BMAD Agent GUI', role: 'about' },
         { type: 'separator' },
-        { label: 'Preferences...', accelerator: 'CmdOrCtrl+,', click: () => mainWindow.webContents.send('navigate', '/config') },
+        { label: 'Préférences...', accelerator: 'CmdOrCtrl+,', click: () => mainWindow.webContents.send('navigate', '/config') },
         { type: 'separator' },
-        { label: 'Quit', accelerator: 'CmdOrCtrl+Q', click: () => app.quit() }
+        { label: 'Quitter', accelerator: 'CmdOrCtrl+Q', click: () => app.quit() }
       ]
     },
     {
-      label: 'View',
+      label: 'Affichage',
       submenu: [
-        { label: 'Dashboard', accelerator: 'CmdOrCtrl+1', click: () => mainWindow.webContents.send('navigate', '/') },
+        { label: 'Accueil', accelerator: 'CmdOrCtrl+1', click: () => mainWindow.webContents.send('navigate', '/') },
         { label: 'Agents', accelerator: 'CmdOrCtrl+2', click: () => mainWindow.webContents.send('navigate', '/agents') },
         { label: 'Sessions', accelerator: 'CmdOrCtrl+3', click: () => mainWindow.webContents.send('navigate', '/sessions') },
-        { label: 'Queue Monitor', accelerator: 'CmdOrCtrl+4', click: () => mainWindow.webContents.send('navigate', '/queue') },
+        { label: 'File d\'attente', accelerator: 'CmdOrCtrl+4', click: () => mainWindow.webContents.send('navigate', '/queue') },
         { label: 'Workflows', accelerator: 'CmdOrCtrl+5', click: () => mainWindow.webContents.send('navigate', '/workflows') },
         { type: 'separator' },
         { role: 'reload' },
@@ -75,7 +75,7 @@ function createWindow() {
       ]
     },
     {
-      label: 'Edit',
+      label: 'Édition',
       submenu: [
         { role: 'undo' }, { role: 'redo' }, { type: 'separator' },
         { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }

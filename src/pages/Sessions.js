@@ -55,10 +55,10 @@ export default function Sessions() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h2>Sessions</h2>
-            <p>Manage agent conversation sessions</p>
+            <p>Gérer les sessions de conversation des agents</p>
           </div>
           <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-            ➕ New Session
+            ➕ Nouvelle session
           </button>
         </div>
       </div>
@@ -67,11 +67,11 @@ export default function Sessions() {
         {/* Stats */}
         <div className="grid-3" style={{ marginBottom: 24 }}>
           <div className="stat-card">
-            <div className="stat-label">Active</div>
+            <div className="stat-label">Actives</div>
             <div className="stat-value green">{activeSessions.length}</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Suspended</div>
+            <div className="stat-label">Suspendues</div>
             <div className="stat-value yellow">{suspendedSessions.length}</div>
           </div>
           <div className="stat-card">
@@ -81,20 +81,20 @@ export default function Sessions() {
         </div>
 
         {loading ? (
-          <div className="empty-state pulse">Loading sessions...</div>
+          <div className="empty-state pulse">Chargement des sessions...</div>
         ) : sessions.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">💬</div>
-            <h3>No sessions yet</h3>
-            <p style={{ marginBottom: 16 }}>Create your first agent session to get started</p>
-            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>Create Session</button>
+            <h3>Aucune session</h3>
+            <p style={{ marginBottom: 16 }}>Créez votre première session d'agent pour commencer</p>
+            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>Créer une session</button>
           </div>
         ) : (
           <>
             {/* Active Sessions */}
             {activeSessions.length > 0 && (
               <div style={{ marginBottom: 24 }}>
-                <h3 style={{ marginBottom: 12, fontSize: 16 }}>🟢 Active Sessions</h3>
+                <h3 style={{ marginBottom: 12, fontSize: 16 }}>🟢 Sessions actives</h3>
                 <div style={{ display: 'grid', gap: 12 }}>
                   {activeSessions.map(session => (
                     <SessionCard key={session.id} session={session} onSuspend={handleSuspend} onResume={handleResume} onDelete={handleDelete} />
@@ -106,7 +106,7 @@ export default function Sessions() {
             {/* Suspended Sessions */}
             {suspendedSessions.length > 0 && (
               <div style={{ marginBottom: 24 }}>
-                <h3 style={{ marginBottom: 12, fontSize: 16 }}>🟡 Suspended Sessions</h3>
+                <h3 style={{ marginBottom: 12, fontSize: 16 }}>🟡 Sessions suspendues</h3>
                 <div style={{ display: 'grid', gap: 12 }}>
                   {suspendedSessions.map(session => (
                     <SessionCard key={session.id} session={session} onSuspend={handleSuspend} onResume={handleResume} onDelete={handleDelete} />
@@ -118,7 +118,7 @@ export default function Sessions() {
             {/* Other Sessions */}
             {otherSessions.length > 0 && (
               <div>
-                <h3 style={{ marginBottom: 12, fontSize: 16 }}>📁 History</h3>
+                <h3 style={{ marginBottom: 12, fontSize: 16 }}>📁 Historique</h3>
                 <div className="table-container">
                   <table>
                     <thead>
@@ -151,11 +151,11 @@ export default function Sessions() {
           <div className="modal-overlay" onClick={() => setShowCreate(false)}>
             <div className="modal" onClick={e => e.stopPropagation()}>
               <div className="modal-header">
-                <h3>Create New Session</h3>
+                <h3>Nouvelle session</h3>
                 <button className="modal-close" onClick={() => setShowCreate(false)}>×</button>
               </div>
               <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
-                Select an agent to start a new conversation session.
+                Sélectionnez un agent pour démarrer une nouvelle session de conversation.
               </p>
               <div style={{ display: 'grid', gap: 8, marginBottom: 24 }}>
                 {agents.map(agent => (
@@ -183,9 +183,9 @@ export default function Sessions() {
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>Cancel</button>
+                <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>Annuler</button>
                 <button className="btn btn-primary" onClick={handleCreate} disabled={!selectedAgent}>
-                  Create Session
+                  Créer la session
                 </button>
               </div>
             </div>
@@ -211,14 +211,14 @@ function SessionCard({ session, onSuspend, onResume, onDelete }) {
         <span className={`badge badge-${session.status}`}>{session.status}</span>
         <div style={{ display: 'flex', gap: 8 }}>
           {session.status === 'active' && (
-            <button className="btn btn-sm btn-secondary" onClick={() => onSuspend(session.id)}>⏸ Suspend</button>
+            <button className="btn btn-sm btn-secondary" onClick={() => onSuspend(session.id)}>⏸ Suspendre</button>
           )}
           {session.status === 'suspended' && (
-            <button className="btn btn-sm btn-primary" onClick={() => onResume(session.id)}>▶ Resume</button>
+            <button className="btn btn-sm btn-primary" onClick={() => onResume(session.id)}>▶ Reprendre</button>
           )}
           <button className="btn btn-sm btn-ghost" style={{ color: 'var(--accent-red, #ef4444)' }} onClick={() => onDelete(session.id)} title="Supprimer">🗑️</button>
           <button className="btn btn-sm btn-ghost" onClick={() => setExpanded(!expanded)}>
-            {expanded ? '▲' : '▼'} Details
+            {expanded ? '▲' : '▼'} Détails
           </button>
         </div>
       </div>
@@ -227,11 +227,11 @@ function SessionCard({ session, onSuspend, onResume, onDelete }) {
         <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
           <div className="grid-3" style={{ marginBottom: 12 }}>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Created</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Créée le</div>
               <div style={{ fontSize: 13 }}>{new Date(session.created).toLocaleString()}</div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Last Activity</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Dernière activité</div>
               <div style={{ fontSize: 13 }}>{new Date(session.lastActivity).toLocaleString()}</div>
             </div>
             <div>
@@ -242,7 +242,7 @@ function SessionCard({ session, onSuspend, onResume, onDelete }) {
 
           {historyLen > 0 && (
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Recent messages:</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Messages récents :</div>
               <div className="code-block" style={{ maxHeight: 200, overflow: 'auto', fontSize: 12 }}>
                 {session.context.conversationHistory.slice(-5).map((entry, i) => (
                   <div key={i} style={{ marginBottom: 8 }}>

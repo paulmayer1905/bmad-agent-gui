@@ -152,6 +152,7 @@ export default function AgentChat() {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const autoStarted = useRef(false);
+  const streamingTimeout = useRef(null);
 
   // Load agents list (no blocking provider check)
   useEffect(() => {
@@ -184,10 +185,27 @@ export default function AgentChat() {
     const cleanupChunk = api.chat.onStreamChunk((sid, chunk) => {
       if (session && sid === session.sessionId) {
         setStreamingText(prev => prev + chunk.text);
+        // Reset timeout on each chunk received
+        if (streamingTimeout.current) clearTimeout(streamingTimeout.current);
+        streamingTimeout.current = setTimeout(() => {
+          // No chunk received for 2 minutes — assume stream is dead
+          setStreamingText(prev => {
+            if (prev) {
+              setMessages(msgs => [...msgs, {
+                role: 'assistant',
+                content: prev + '\n\n⚠️ *Streaming interrompu (timeout)*',
+                timestamp: Date.now()
+              }]);
+            }
+            return '';
+          });
+          setLoading(false);
+        }, 120000);
       }
     });
     const cleanupDone = api.chat.onStreamDone((sid, result) => {
       if (session && sid === session.sessionId) {
+        if (streamingTimeout.current) clearTimeout(streamingTimeout.current);
         setStreamingText('');
         setMessages(prev => [...prev, {
           role: 'assistant',
@@ -200,12 +218,14 @@ export default function AgentChat() {
     });
     const cleanupError = api.chat.onStreamError((sid, err) => {
       if (session && sid === session.sessionId) {
+        if (streamingTimeout.current) clearTimeout(streamingTimeout.current);
         setStreamingText('');
         setError(err);
         setLoading(false);
       }
     });
     return () => {
+      if (streamingTimeout.current) clearTimeout(streamingTimeout.current);
       if (cleanupChunk) cleanupChunk();
       if (cleanupDone) cleanupDone();
       if (cleanupError) cleanupError();

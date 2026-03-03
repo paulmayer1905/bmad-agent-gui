@@ -49,25 +49,25 @@ export default function Workflows() {
             Workflows
           </button>
           <button className={`tab ${tab === 'teams' ? 'active' : ''}`} onClick={() => setTab('teams')}>
-            Agent Teams
+            Équipes d'agents
           </button>
           <button className={`tab ${tab === 'visualizer' ? 'active' : ''}`} onClick={() => setTab('visualizer')}>
-            Visual Map
+            Carte visuelle
           </button>
         </div>
 
         {loading ? (
-          <div className="empty-state pulse">Loading...</div>
+          <div className="empty-state pulse">Chargement...</div>
         ) : tab === 'workflows' ? (
           <div className="grid-2">
             {/* Workflow List */}
             <div>
-              <h3 style={{ marginBottom: 12, fontSize: 16 }}>Available Workflows</h3>
+              <h3 style={{ marginBottom: 12, fontSize: 16 }}>Workflows disponibles</h3>
               {workflows.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-state-icon">🔀</div>
-                  <h3>No workflows found</h3>
-                  <p>Workflows are loaded from bmad-core/workflows/</p>
+                  <h3>Aucun workflow trouvé</h3>
+                  <p>Les workflows sont chargés depuis bmad-core/workflows/</p>
                 </div>
               ) : (
                 <div style={{ display: 'grid', gap: 8 }}>
@@ -119,7 +119,7 @@ export default function Workflows() {
             {teams.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon">👥</div>
-                <h3>No teams configured</h3>
+                <h3>Aucune équipe configurée</h3>
               </div>
             ) : (
               <div className="grid-2">
@@ -160,7 +160,7 @@ export default function Workflows() {
           /* Visual Map */
           <div className="workflow-canvas">
             <h3 style={{ marginBottom: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
-              BMAD Agent Interaction Map
+              Carte d'interaction des agents BMAD
             </h3>
 
             {/* Orchestration Layer */}
@@ -184,7 +184,7 @@ export default function Workflows() {
 
             {/* Planning Layer */}
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 2 }}>Planning & Analysis</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 2 }}>Planification & Analyse</div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
                 {agents.filter(a => ['analyst', 'po', 'pm', 'architect'].includes(a.name)).map(a => (
                   <div key={a.name} className="workflow-node" style={{ borderColor: agentColors[a.name], cursor: 'pointer' }} onClick={() => navigate(`/chat/${a.name}`)} title={`Discuter avec ${a.title}`}>
@@ -203,7 +203,7 @@ export default function Workflows() {
 
             {/* Execution Layer */}
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 2 }}>Execution & Quality</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 2 }}>Exécution & Qualité</div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
                 {agents.filter(a => ['dev', 'qa', 'ux-expert', 'sm'].includes(a.name)).map(a => (
                   <div key={a.name} className="workflow-node" style={{ borderColor: agentColors[a.name], cursor: 'pointer' }} onClick={() => navigate(`/chat/${a.name}`)} title={`Discuter avec ${a.title}`}>

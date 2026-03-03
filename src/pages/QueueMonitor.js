@@ -38,11 +38,11 @@ export default function QueueMonitor() {
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h2>Queue Monitor</h2>
-            <p>Message queue status and operations</p>
+            <h2>File d'attente</h2>
+            <p>Statut et opérations de la file de messages</p>
           </div>
           <button className="btn btn-secondary" onClick={handleCleanup}>
-            🧹 Cleanup Old Messages
+            🧹 Nettoyer les anciens messages
           </button>
         </div>
       </div>
@@ -51,31 +51,31 @@ export default function QueueMonitor() {
         {/* Metrics */}
         <div className="grid-4" style={{ marginBottom: 24 }}>
           <div className="stat-card" onClick={() => setTab('active')} style={{ cursor: 'pointer', border: tab === 'active' ? '2px solid var(--accent-blue)' : undefined }}>
-            <div className="stat-label">Active</div>
+            <div className="stat-label">Actifs</div>
             <div className="stat-value blue">{metrics.active}</div>
-            <div className="stat-footer">In progress</div>
+            <div className="stat-footer">En cours</div>
           </div>
           <div className="stat-card" onClick={() => setTab('completed')} style={{ cursor: 'pointer', border: tab === 'completed' ? '2px solid var(--accent-green)' : undefined }}>
-            <div className="stat-label">Completed</div>
+            <div className="stat-label">Terminés</div>
             <div className="stat-value green">{metrics.completed}</div>
-            <div className="stat-footer">Successfully processed</div>
+            <div className="stat-footer">Traités avec succès</div>
           </div>
           <div className="stat-card" onClick={() => setTab('failed')} style={{ cursor: 'pointer', border: tab === 'failed' ? '2px solid var(--accent-red)' : undefined }}>
-            <div className="stat-label">Failed</div>
+            <div className="stat-label">Échoués</div>
             <div className="stat-value red">{metrics.failed}</div>
-            <div className="stat-footer">Needs attention</div>
+            <div className="stat-footer">Nécessite attention</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Total</div>
             <div className="stat-value purple">{metrics.total}</div>
-            <div className="stat-footer">All time</div>
+            <div className="stat-footer">Depuis le début</div>
           </div>
         </div>
 
         {/* Activity Chart */}
         {metrics.history && metrics.history.length > 0 && (
           <div className="card" style={{ marginBottom: 24 }}>
-            <h3 style={{ marginBottom: 16 }}>Activity (Last 24h)</h3>
+            <h3 style={{ marginBottom: 16 }}>Activité (24 dernières heures)</h3>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 120, padding: '0 8px' }}>
               {metrics.history.map((h, i) => {
                 const maxVal = Math.max(...metrics.history.map(x => x.completed + x.failed), 1);
@@ -97,10 +97,10 @@ export default function QueueMonitor() {
             </div>
             <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 12 }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 12, height: 12, borderRadius: 2, background: 'var(--accent-blue)', display: 'inline-block' }} /> Completed
+                <span style={{ width: 12, height: 12, borderRadius: 2, background: 'var(--accent-blue)', display: 'inline-block' }} /> Terminés
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 12, height: 12, borderRadius: 2, background: 'var(--accent-red)', display: 'inline-block' }} /> Failed
+                <span style={{ width: 12, height: 12, borderRadius: 2, background: 'var(--accent-red)', display: 'inline-block' }} /> Échoués
               </span>
             </div>
           </div>
@@ -110,23 +110,23 @@ export default function QueueMonitor() {
         <div>
           <div className="tabs">
             <button className={`tab ${tab === 'active' ? 'active' : ''}`} onClick={() => setTab('active')}>
-              Active ({metrics.active})
+              Actifs ({metrics.active})
             </button>
             <button className={`tab ${tab === 'completed' ? 'active' : ''}`} onClick={() => setTab('completed')}>
-              Completed ({metrics.completed})
+              Terminés ({metrics.completed})
             </button>
             <button className={`tab ${tab === 'failed' ? 'active' : ''}`} onClick={() => setTab('failed')}>
-              Failed ({metrics.failed})
+              Échoués ({metrics.failed})
             </button>
           </div>
 
           {loading ? (
-            <div className="empty-state pulse">Loading messages...</div>
+            <div className="empty-state pulse">Chargement des messages...</div>
           ) : messages.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📭</div>
-              <h3>No {tab} messages</h3>
-              <p>The queue is empty for this status</p>
+              <h3>Aucun message {tab === 'active' ? 'actif' : tab === 'completed' ? 'terminé' : 'échoué'}</h3>
+              <p>La file est vide pour ce statut</p>
             </div>
           ) : (
             <div className="table-container">
@@ -136,8 +136,8 @@ export default function QueueMonitor() {
                     <th>ID</th>
                     <th>Type</th>
                     <th>Status</th>
-                    <th>Timestamp</th>
-                    <th>Retries</th>
+                    <th>Horodatage</th>
+                    <th>Tentatives</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -154,7 +154,7 @@ export default function QueueMonitor() {
                       <td>
                         {msg.status === 'failed' && (
                           <button className="btn btn-sm btn-secondary" onClick={() => handleRetry(msg.id)}>
-                            🔄 Retry
+                            🔄 Réessayer
                           </button>
                         )}
                       </td>

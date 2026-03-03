@@ -34,7 +34,7 @@ export default function Tasks() {
 
       <div className="page-content animate-in">
         {loading ? (
-          <div className="empty-state pulse">Loading tasks...</div>
+          <div className="empty-state pulse">Chargement des tâches...</div>
         ) : (
           <div className="grid-2">
             {/* List */}
@@ -52,7 +52,7 @@ export default function Tasks() {
               {filtered.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-state-icon">📝</div>
-                  <h3>No tasks found</h3>
+                  <h3>Aucune tâche trouvée</h3>
                 </div>
               ) : (
                 <div style={{ display: 'grid', gap: 8 }}>
@@ -93,7 +93,7 @@ export default function Tasks() {
 
                   {detail.purpose && (
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Purpose</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Objectif</div>
                       <div style={{ fontSize: 14, lineHeight: 1.6 }}>{detail.purpose}</div>
                     </div>
                   )}
@@ -134,7 +134,7 @@ export default function Tasks() {
 
                   {detail.rawContent && (
                     <div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Raw Content</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Contenu brut</div>
                       <div className="code-block" style={{ maxHeight: 400, overflow: 'auto' }}>
                         {detail.rawContent}
                       </div>

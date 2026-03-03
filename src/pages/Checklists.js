@@ -28,16 +28,16 @@ export default function Checklists() {
 
       <div className="page-content animate-in">
         {loading ? (
-          <div className="empty-state pulse">Loading checklists...</div>
+          <div className="empty-state pulse">Chargement des checklists...</div>
         ) : (
           <div className="grid-2">
             {/* List */}
             <div>
-              <h3 style={{ marginBottom: 12, fontSize: 16 }}>Available Checklists</h3>
+              <h3 style={{ marginBottom: 12, fontSize: 16 }}>Checklists disponibles</h3>
               {checklists.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-state-icon">✅</div>
-                  <h3>No checklists found</h3>
+                  <h3>Aucune checklist trouvée</h3>
                 </div>
               ) : (
                 <div style={{ display: 'grid', gap: 8 }}>
@@ -104,7 +104,7 @@ export default function Checklists() {
                       {detail.rawContent}
                     </div>
                   ) : (
-                    <p style={{ color: 'var(--text-muted)' }}>No content available</p>
+                    <p style={{ color: 'var(--text-muted)' }}>Aucun contenu disponible</p>
                   )}
                 </div>
               ) : (

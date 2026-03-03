@@ -35,17 +35,17 @@ export default function ConfigEditor() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h2>Configuration</h2>
-            <p>BMAD core configuration and system settings</p>
+            <p>Configuration BMAD et paramètres système</p>
           </div>
           {tab === 'editor' && (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              {saved && <span style={{ color: 'var(--accent-green)', fontSize: 14 }}>✓ Saved!</span>}
-              {hasChanges && <span style={{ color: 'var(--accent-yellow)', fontSize: 12 }}>Unsaved changes</span>}
+              {saved && <span style={{ color: 'var(--accent-green)', fontSize: 14 }}>✓ Sauvegardé !</span>}
+              {hasChanges && <span style={{ color: 'var(--accent-yellow)', fontSize: 12 }}>Modifications non sauvegardées</span>}
               <button className="btn btn-secondary" onClick={() => setEditedContent(config.raw)} disabled={!hasChanges}>
-                Reset
+                Réinitialiser
               </button>
               <button className="btn btn-primary" onClick={handleSave} disabled={!hasChanges}>
-                💾 Save
+                💾 Sauvegarder
               </button>
             </div>
           )}
@@ -55,18 +55,18 @@ export default function ConfigEditor() {
       <div className="page-content animate-in">
         <div className="tabs">
           <button className={`tab ${tab === 'editor' ? 'active' : ''}`} onClick={() => setTab('editor')}>
-            Config Editor
+            Éditeur
           </button>
           <button className={`tab ${tab === 'visual' ? 'active' : ''}`} onClick={() => setTab('visual')}>
-            Visual View
+            Vue visuelle
           </button>
           <button className={`tab ${tab === 'system' ? 'active' : ''}`} onClick={() => setTab('system')}>
-            System Info
+            Informations système
           </button>
         </div>
 
         {loading ? (
-          <div className="empty-state pulse">Loading configuration...</div>
+          <div className="empty-state pulse">Chargement de la configuration...</div>
 
         ) : tab === 'editor' ? (
           <div>
@@ -133,7 +133,7 @@ export default function ConfigEditor() {
             ) : (
               <div className="empty-state">
                 <div className="empty-state-icon">⚙️</div>
-                <h3>No configuration parsed</h3>
+                <h3>Aucune configuration analysée</h3>
               </div>
             )}
           </div>
@@ -142,7 +142,7 @@ export default function ConfigEditor() {
           /* System Info */
           <div className="grid-2">
             <div className="card">
-              <h3 style={{ marginBottom: 16 }}>System Information</h3>
+              <h3 style={{ marginBottom: 16 }}>Informations système</h3>
               <div style={{ display: 'grid', gap: 12 }}>
                 {Object.entries(sysInfo).map(([key, value]) => (
                   <div key={key} style={{
@@ -160,7 +160,7 @@ export default function ConfigEditor() {
                       fontFamily: 'var(--font-mono)',
                       color: typeof value === 'boolean' ? (value ? 'var(--accent-green)' : 'var(--accent-red)') : 'var(--text-primary)'
                     }}>
-                      {typeof value === 'boolean' ? (value ? '✓ Yes' : '✗ No') : String(value)}
+                      {typeof value === 'boolean' ? (value ? '✓ Oui' : '✗ Non') : String(value)}
                     </span>
                   </div>
                 ))}
@@ -168,7 +168,7 @@ export default function ConfigEditor() {
             </div>
 
             <div className="card">
-              <h3 style={{ marginBottom: 16 }}>Paths</h3>
+              <h3 style={{ marginBottom: 16 }}>Chemins</h3>
               <div style={{ display: 'grid', gap: 12 }}>
                 {['bmadRoot', 'integrationRoot', 'coreRoot', 'basePath'].map(key => (
                   sysInfo[key] && (
