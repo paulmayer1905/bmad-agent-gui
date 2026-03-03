@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog } = require('electron');
 const path = require('path');
 const url = require('url');
 
@@ -163,6 +163,22 @@ function registerIpcHandlers() {
   safeHandle('ai:configured', () => backend.isAIConfigured());
   safeHandle('ollama:status', () => backend.getOllamaStatus());
   safeHandle('ai:validate-key', (_, provider, apiKey) => backend.validateApiKey(provider, apiKey));
+
+  // File upload for chat
+  safeHandle('chat:upload-file', async (_, sessionId, filePath) => {
+    return await backend.uploadFileToChat(sessionId, filePath);
+  });
+
+  safeHandle('chat:pick-file', async () => {
+    const { getDialogFilters } = require('../src/backend/file-processor');
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Ajouter un fichier au chat',
+      properties: ['openFile', 'multiSelections'],
+      filters: getDialogFilters(),
+    });
+    if (result.canceled) return { canceled: true, filePaths: [] };
+    return { canceled: false, filePaths: result.filePaths };
+  });
 
   // Streaming chat (uses IPC events instead of invoke)
   ipcMain.on('chat:stream', async (event, sessionId, message) => {

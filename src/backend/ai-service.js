@@ -1212,6 +1212,52 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
     return { success: true };
   }
 
+  /**
+   * Add file content to a conversation as context.
+   * @param {string} sessionId
+   * @param {Object} processed - Output from file-processor.processFile()
+   * @param {string} formattedText - Output from file-processor.formatFileForLLM()
+   * @returns {Object} { success, fileName, fileType, note }
+   */
+  addFileToConversation(sessionId, processed, formattedText) {
+    const conversation = this.conversations.get(sessionId);
+    if (!conversation) throw new Error('SESSION_NOT_FOUND');
+
+    if (processed.error) {
+      return { success: false, fileName: processed.fileName, error: processed.error };
+    }
+
+    // For images on vision-capable providers, store base64 for multimodal use
+    if (processed.fileType === 'image' && processed.base64Data) {
+      const supportsVision = ['openai', 'gemini', 'anthropic'].includes(this.providerName);
+      if (supportsVision) {
+        // Store image data in conversation for next message
+        if (!conversation.pendingFiles) conversation.pendingFiles = [];
+        conversation.pendingFiles.push({
+          type: 'image',
+          fileName: processed.fileName,
+          mimeType: processed.mimeType,
+          base64Data: processed.base64Data,
+        });
+      }
+    }
+
+    // Always add text representation as a user message for context
+    conversation.messages.push({
+      role: 'user',
+      content: formattedText
+    });
+
+    return {
+      success: true,
+      fileName: processed.fileName,
+      fileType: processed.fileType,
+      size: processed.size,
+      note: processed.note || null,
+      hasVisionData: !!(processed.fileType === 'image' && processed.base64Data),
+    };
+  }
+
   listChats() {
     const chats = [];
     for (const [id, conv] of this.conversations) {

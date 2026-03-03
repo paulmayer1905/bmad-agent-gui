@@ -406,6 +406,17 @@ class BMADBackend {
     };
   }
 
+  async uploadFileToChat(sessionId, filePath) {
+    const { processFile, formatFileForLLM } = require('./file-processor');
+    const processed = await processFile(filePath);
+    const formattedText = formatFileForLLM(processed);
+    const result = this._aiService.addFileToConversation(sessionId, processed, formattedText);
+    return {
+      ...result,
+      formattedText,
+    };
+  }
+
   async sendChatMessage(sessionId, message) {
     return await this._aiService.sendMessage(sessionId, message);
   }

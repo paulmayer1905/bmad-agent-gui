@@ -78,6 +78,8 @@ contextBridge.exposeInMainWorld('bmadAPI', {
     history: (sessionId) => ipcRenderer.invoke('chat:history', sessionId),
     clear: (sessionId) => ipcRenderer.invoke('chat:clear', sessionId),
     list: () => ipcRenderer.invoke('chat:list'),
+    pickFile: () => ipcRenderer.invoke('chat:pick-file'),
+    uploadFile: (sessionId, filePath) => ipcRenderer.invoke('chat:upload-file', sessionId, filePath),
   },
 
   // AI Config

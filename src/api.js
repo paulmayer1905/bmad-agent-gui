@@ -145,6 +145,14 @@ const api = {
       if (isElectron) return window.bmadAPI.chat.list();
       return [];
     },
+    pickFile: async () => {
+      if (isElectron) return window.bmadAPI.chat.pickFile();
+      return { canceled: true, filePaths: [] };
+    },
+    uploadFile: async (sessionId, filePath) => {
+      if (isElectron) return window.bmadAPI.chat.uploadFile(sessionId, filePath);
+      return { success: false, error: 'Non disponible en mode navigateur' };
+    },
   },
 
   ai: {

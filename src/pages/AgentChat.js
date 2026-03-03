@@ -19,6 +19,8 @@ export default function AgentChat() {
   const [streamingText, setStreamingText] = useState('');
   const [useStreaming, setUseStreaming] = useState(true);
   const [agentsLoaded, setAgentsLoaded] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -176,6 +178,7 @@ export default function AgentChat() {
     setStreamingText('');
     setSelectedAgent(null);
     setError(null);
+    setUploadedFiles([]);
     autoStarted.current = false;
   };
 
@@ -201,6 +204,67 @@ export default function AgentChat() {
     autoStarted.current = false;
     if (selectedAgent) {
       handleStartChat(selectedAgent);
+    }
+  };
+
+  // ─── File Upload Handler ─────────────────────────────────────────
+  const handleUploadFile = async () => {
+    if (!session || uploading) return;
+    try {
+      const pickResult = await api.chat.pickFile();
+      if (pickResult.canceled || !pickResult.filePaths?.length) return;
+
+      setUploading(true);
+      const results = [];
+
+      for (const filePath of pickResult.filePaths) {
+        try {
+          const result = await api.chat.uploadFile(session.sessionId, filePath);
+          results.push(result);
+
+          if (result.success) {
+            // Add a visual message in the chat showing the upload
+            const icon = result.fileType === 'image' ? '🖼️'
+              : result.fileType === 'pdf' ? '📄'
+              : result.fileType === 'docx' ? '📝'
+              : result.fileType === 'office' ? '📊'
+              : '📎';
+
+            setMessages(prev => [...prev, {
+              role: 'user',
+              content: `${icon} Fichier uploadé : **${result.fileName}** (${result.fileType}, ${(result.size / 1024).toFixed(0)} KB)${result.note ? '\n⚠️ ' + result.note : ''}`,
+              timestamp: Date.now(),
+              isFile: true,
+              fileInfo: result,
+            }]);
+
+            setUploadedFiles(prev => [...prev, {
+              name: result.fileName,
+              type: result.fileType,
+              size: result.size,
+            }]);
+          } else {
+            setMessages(prev => [...prev, {
+              role: 'system',
+              content: `⚠️ Erreur upload ${result.fileName || 'fichier'} : ${result.error}`,
+              timestamp: Date.now(),
+              isError: true,
+            }]);
+          }
+        } catch (err) {
+          setMessages(prev => [...prev, {
+            role: 'system',
+            content: `⚠️ Erreur : ${err.message || 'Upload échoué'}`,
+            timestamp: Date.now(),
+            isError: true,
+          }]);
+        }
+      }
+
+      setUploading(false);
+    } catch (err) {
+      setUploading(false);
+      console.error('Upload error:', err);
     }
   };
 
@@ -454,8 +518,8 @@ export default function AgentChat() {
             />
             <span>Stream</span>
           </label>
-          <button className="btn btn-ghost" onClick={handleClearChat} title="Nouvelle conversation">
-            🗑️ Nouveau
+          <button className="btn btn-ghost" onClick={handleClearChat} title="Supprimer la conversation">
+            🗑️ Supprimer
           </button>
         </div>
       </div>
@@ -463,10 +527,12 @@ export default function AgentChat() {
       {/* Messages area */}
       <div className="chat-messages">
         {messages.map((msg, i) => (
-          <div key={i} className={`chat-message chat-message-${msg.role}`}>
-            <div className="chat-message-avatar">
-              {msg.role === 'assistant' ? session.agentIcon : '👤'}
-            </div>
+          <div key={i} className={`chat-message chat-message-${msg.role}${msg.isFile ? ' chat-message-file' : ''}${msg.isError ? ' chat-message-error' : ''}`}>
+            {msg.role !== 'system' && (
+              <div className="chat-message-avatar">
+                {msg.role === 'assistant' ? session.agentIcon : msg.isFile ? '📎' : '👤'}
+              </div>
+            )}
             <div className="chat-message-content">
               <div className="chat-message-text">
                 {msg.content.split('\n').map((line, j) => (
@@ -527,7 +593,21 @@ export default function AgentChat() {
 
       {/* Input area */}
       <div className="chat-input-area">
+        {/* Uploaded files indicator */}
+        {uploadedFiles.length > 0 && (
+          <div className="chat-upload-indicator">
+            📋 {uploadedFiles.length} fichier{uploadedFiles.length > 1 ? 's' : ''} chargé{uploadedFiles.length > 1 ? 's' : ''} dans le contexte
+          </div>
+        )}
         <div className="chat-input-wrapper">
+          <button
+            className="chat-upload-btn"
+            onClick={handleUploadFile}
+            disabled={loading || uploading}
+            title="Ajouter un fichier (PDF, image, texte, code, Word...)"
+          >
+            {uploading ? '⏳' : '📎'}
+          </button>
           <textarea
             ref={textareaRef}
             value={input}
@@ -548,7 +628,7 @@ export default function AgentChat() {
           </button>
         </div>
         <div className="chat-input-hint">
-          Entrée pour envoyer · Shift+Entrée pour un retour à la ligne
+          Entrée pour envoyer · Shift+Entrée pour un retour à la ligne · 📎 pour joindre un fichier
         </div>
       </div>
     </div>
