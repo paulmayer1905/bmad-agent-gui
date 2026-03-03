@@ -65,7 +65,8 @@ function createWindow() {
         { label: 'Accueil', accelerator: 'CmdOrCtrl+1', click: () => mainWindow.webContents.send('navigate', '/') },
         { label: 'Agents', accelerator: 'CmdOrCtrl+2', click: () => mainWindow.webContents.send('navigate', '/agents') },
         { label: 'Sessions', accelerator: 'CmdOrCtrl+3', click: () => mainWindow.webContents.send('navigate', '/sessions') },
-        { label: 'File d\'attente', accelerator: 'CmdOrCtrl+4', click: () => mainWindow.webContents.send('navigate', '/queue') },
+        { label: 'Collaboration', accelerator: 'CmdOrCtrl+4', click: () => mainWindow.webContents.send('navigate', '/collaboration') },
+        { label: 'File d\'attente', accelerator: 'CmdOrCtrl+5', click: () => mainWindow.webContents.send('navigate', '/queue') },
         { label: 'Workflows', accelerator: 'CmdOrCtrl+5', click: () => mainWindow.webContents.send('navigate', '/workflows') },
         { type: 'separator' },
         { role: 'reload' },
@@ -196,6 +197,61 @@ function registerIpcHandlers() {
     await fsPromises.writeFile(result.filePath, content, 'utf8');
     return { canceled: false, filePath: result.filePath };
   });
+
+  // ─── Project Context (Shared Memory) ────────────────────────────────
+  safeHandle('context:stats', () => backend.getProjectContextStats());
+  safeHandle('context:artifacts:list', (_, filter) => backend.listArtifacts(filter));
+  safeHandle('context:artifacts:get', (_, id) => backend.getArtifact(id));
+  safeHandle('context:artifacts:add', (_, artifact) => backend.addArtifact(artifact));
+  safeHandle('context:artifacts:update', (_, id, updates) => backend.updateArtifact(id, updates));
+  safeHandle('context:artifacts:remove', (_, id) => backend.removeArtifact(id));
+  safeHandle('context:decisions:list', () => backend.listDecisions());
+  safeHandle('context:decisions:add', (_, decision) => backend.addDecision(decision));
+  safeHandle('context:clear', () => backend.clearProjectContext());
+
+  // ─── Coordination (Delegation, Pipeline, Party) ──────────────────────
+  safeHandle('coord:delegate', (_, fromSessionId, targetAgent, question, options) =>
+    backend.delegateToAgent(fromSessionId, targetAgent, question, options));
+
+  safeHandle('coord:pipeline:templates', () => backend.getPipelineTemplates());
+  safeHandle('coord:pipeline:list', () => backend.listPipelines());
+  safeHandle('coord:pipeline:status', (_, pipelineId) => backend.getPipelineStatus(pipelineId));
+
+  // Pipeline execution (uses events for progress)
+  safeHandle('coord:pipeline:execute', async (_, pipeline, options) => {
+    const coordinator = backend.getCoordinator();
+
+    // Forward pipeline events to renderer
+    const onStepStart = (data) => {
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('pipeline:step:start', data);
+    };
+    const onStepDone = (data) => {
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('pipeline:step:done', data);
+    };
+    const onStepError = (data) => {
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('pipeline:step:error', data);
+    };
+
+    coordinator.on('pipeline:step:start', onStepStart);
+    coordinator.on('pipeline:step:done', onStepDone);
+    coordinator.on('pipeline:step:error', onStepError);
+
+    try {
+      const result = await backend.executePipeline(pipeline, options);
+      return result;
+    } finally {
+      coordinator.removeListener('pipeline:step:start', onStepStart);
+      coordinator.removeListener('pipeline:step:done', onStepDone);
+      coordinator.removeListener('pipeline:step:error', onStepError);
+    }
+  });
+
+  // Party mode
+  safeHandle('coord:party:start', (_, agentNames) => backend.startParty(agentNames));
+  safeHandle('coord:party:send', (_, partyId, message, options) => backend.sendPartyMessage(partyId, message, options));
+  safeHandle('coord:party:get', (_, partyId) => backend.getPartySession(partyId));
+  safeHandle('coord:party:end', (_, partyId) => backend.endParty(partyId));
+  safeHandle('coord:party:list', () => backend.listPartySessions());
 
   // Streaming chat (uses IPC events instead of invoke)
   ipcMain.on('chat:stream', async (event, sessionId, message) => {

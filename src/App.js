@@ -12,6 +12,7 @@ import Workflows from './pages/Workflows';
 import ConfigEditor from './pages/ConfigEditor';
 import Checklists from './pages/Checklists';
 import Tasks from './pages/Tasks';
+import PartyChat from './pages/PartyChat';
 
 function AppInner() {
   const navigate = useNavigate();
@@ -36,6 +37,7 @@ function AppInner() {
           <Route path="/agents/:name" element={<AgentDetail />} />
           <Route path="/chat" element={<AgentChat />} />
           <Route path="/chat/:agentName" element={<AgentChat />} />
+          <Route path="/collaboration" element={<PartyChat />} />
           <Route path="/ai-settings" element={<AISettings />} />
           <Route path="/sessions" element={<Sessions />} />
           <Route path="/queue" element={<QueueMonitor />} />

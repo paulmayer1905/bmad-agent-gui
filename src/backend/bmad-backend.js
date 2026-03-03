@@ -8,6 +8,8 @@ const fsSync = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const AIService = require('./ai-service');
+const ProjectContext = require('./project-context');
+const AgentCoordinator = require('./agent-coordinator');
 
 class BMADBackend {
   constructor(options = {}) {
@@ -26,6 +28,12 @@ class BMADBackend {
     this._aiService = new AIService({
       configPath: path.join(this.basePath, 'ai-config.json')
     });
+
+    // Project context (shared memory)
+    this._projectContext = new ProjectContext({ basePath: this.basePath });
+
+    // Agent coordinator (delegation, pipeline, party mode)
+    this._coordinator = null; // initialized after aiService
   }
 
   async initialize() {
@@ -53,6 +61,17 @@ class BMADBackend {
 
     // Initialize AI service
     await this._aiService.initialize();
+
+    // Initialize project context (shared memory)
+    await this._projectContext.initialize();
+    this._aiService.projectContext = this._projectContext;
+
+    // Initialize coordinator (delegation, pipeline, party mode)
+    this._coordinator = new AgentCoordinator({
+      aiService: this._aiService,
+      projectContext: this._projectContext,
+      bmadBackend: this
+    });
   }
 
   // ─── Agents ─────────────────────────────────────────────────────────────
@@ -455,6 +474,93 @@ class BMADBackend {
 
   async validateApiKey(provider, apiKey) {
     return await this._aiService.validateApiKey(provider, apiKey);
+  }
+
+  // ─── Project Context (Shared Memory) ─────────────────────────────────
+
+  async getProjectContextStats() {
+    return this._projectContext.getStats();
+  }
+
+  async listArtifacts(filter) {
+    return this._projectContext.listArtifacts(filter || {});
+  }
+
+  async getArtifact(id) {
+    const art = this._projectContext.getArtifact(id);
+    if (!art) throw new Error(`Artefact ${id} introuvable`);
+    return art;
+  }
+
+  async addArtifact(artifact) {
+    return await this._projectContext.addArtifact(artifact);
+  }
+
+  async updateArtifact(id, updates) {
+    return await this._projectContext.updateArtifact(id, updates);
+  }
+
+  async removeArtifact(id) {
+    return await this._projectContext.removeArtifact(id);
+  }
+
+  async listDecisions() {
+    return this._projectContext.listDecisions();
+  }
+
+  async addDecision(decision) {
+    return await this._projectContext.addDecision(decision);
+  }
+
+  async clearProjectContext() {
+    await this._projectContext.clear();
+    return { success: true };
+  }
+
+  // ─── Coordination (Delegation, Pipeline, Party) ─────────────────────
+
+  async delegateToAgent(fromSessionId, targetAgentName, question, options) {
+    return await this._coordinator.delegateToAgent(fromSessionId, targetAgentName, question, options || {});
+  }
+
+  async executePipeline(pipeline, options) {
+    return await this._coordinator.executePipeline(pipeline, options || {});
+  }
+
+  getPipelineTemplates() {
+    return this._coordinator.getPipelineTemplates();
+  }
+
+  getPipelineStatus(pipelineId) {
+    return this._coordinator.getPipelineStatus(pipelineId);
+  }
+
+  listPipelines() {
+    return this._coordinator.listPipelines();
+  }
+
+  async startParty(agentNames) {
+    return await this._coordinator.startParty(agentNames);
+  }
+
+  async sendPartyMessage(partyId, message, options) {
+    return await this._coordinator.sendPartyMessage(partyId, message, options || {});
+  }
+
+  getPartySession(partyId) {
+    return this._coordinator.getPartySession(partyId);
+  }
+
+  endParty(partyId) {
+    return this._coordinator.endParty(partyId);
+  }
+
+  listPartySessions() {
+    return this._coordinator.listPartySessions();
+  }
+
+  getCoordinator() {
+    return this._coordinator;
   }
 
   // ─── System ─────────────────────────────────────────────────────────────

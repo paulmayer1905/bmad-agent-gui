@@ -92,6 +92,48 @@ contextBridge.exposeInMainWorld('bmadAPI', {
     validateKey: (provider, apiKey) => ipcRenderer.invoke('ai:validate-key', provider, apiKey),
   },
 
+  // Project Context (Shared Memory)
+  context: {
+    stats: () => ipcRenderer.invoke('context:stats'),
+    listArtifacts: (filter) => ipcRenderer.invoke('context:artifacts:list', filter),
+    getArtifact: (id) => ipcRenderer.invoke('context:artifacts:get', id),
+    addArtifact: (artifact) => ipcRenderer.invoke('context:artifacts:add', artifact),
+    updateArtifact: (id, updates) => ipcRenderer.invoke('context:artifacts:update', id, updates),
+    removeArtifact: (id) => ipcRenderer.invoke('context:artifacts:remove', id),
+    listDecisions: () => ipcRenderer.invoke('context:decisions:list'),
+    addDecision: (decision) => ipcRenderer.invoke('context:decisions:add', decision),
+    clear: () => ipcRenderer.invoke('context:clear'),
+  },
+
+  // Coordination (Delegation, Pipeline, Party Mode)
+  coord: {
+    delegate: (fromSessionId, targetAgent, question, options) =>
+      ipcRenderer.invoke('coord:delegate', fromSessionId, targetAgent, question, options),
+
+    pipelineTemplates: () => ipcRenderer.invoke('coord:pipeline:templates'),
+    listPipelines: () => ipcRenderer.invoke('coord:pipeline:list'),
+    pipelineStatus: (pipelineId) => ipcRenderer.invoke('coord:pipeline:status', pipelineId),
+    executePipeline: (pipeline, options) => ipcRenderer.invoke('coord:pipeline:execute', pipeline, options),
+    onPipelineStepStart: (callback) => {
+      ipcRenderer.on('pipeline:step:start', (_, data) => callback(data));
+      return () => ipcRenderer.removeAllListeners('pipeline:step:start');
+    },
+    onPipelineStepDone: (callback) => {
+      ipcRenderer.on('pipeline:step:done', (_, data) => callback(data));
+      return () => ipcRenderer.removeAllListeners('pipeline:step:done');
+    },
+    onPipelineStepError: (callback) => {
+      ipcRenderer.on('pipeline:step:error', (_, data) => callback(data));
+      return () => ipcRenderer.removeAllListeners('pipeline:step:error');
+    },
+
+    startParty: (agentNames) => ipcRenderer.invoke('coord:party:start', agentNames),
+    sendPartyMessage: (partyId, message, options) => ipcRenderer.invoke('coord:party:send', partyId, message, options),
+    getPartySession: (partyId) => ipcRenderer.invoke('coord:party:get', partyId),
+    endParty: (partyId) => ipcRenderer.invoke('coord:party:end', partyId),
+    listPartySessions: () => ipcRenderer.invoke('coord:party:list'),
+  },
+
   // Navigation events from menu
   onNavigate: (callback) => {
     ipcRenderer.on('navigate', (_, path) => callback(path));

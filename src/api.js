@@ -189,6 +189,102 @@ const api = {
       return { valid: false, error: 'Non disponible en mode navigateur' };
     },
   },
+
+  // Project Context (Shared Memory)
+  context: {
+    stats: async () => {
+      if (isElectron) return window.bmadAPI.context.stats();
+      return { totalArtifacts: 0, totalDecisions: 0, byType: {}, byAgent: {}, lastUpdate: null };
+    },
+    listArtifacts: async (filter) => {
+      if (isElectron) return window.bmadAPI.context.listArtifacts(filter);
+      return [];
+    },
+    getArtifact: async (id) => {
+      if (isElectron) return window.bmadAPI.context.getArtifact(id);
+      return null;
+    },
+    addArtifact: async (artifact) => {
+      if (isElectron) return window.bmadAPI.context.addArtifact(artifact);
+      return { id: 'mock', ...artifact };
+    },
+    updateArtifact: async (id, updates) => {
+      if (isElectron) return window.bmadAPI.context.updateArtifact(id, updates);
+      return { id, ...updates };
+    },
+    removeArtifact: async (id) => {
+      if (isElectron) return window.bmadAPI.context.removeArtifact(id);
+      return { success: true };
+    },
+    listDecisions: async () => {
+      if (isElectron) return window.bmadAPI.context.listDecisions();
+      return [];
+    },
+    addDecision: async (decision) => {
+      if (isElectron) return window.bmadAPI.context.addDecision(decision);
+      return { id: 'mock', ...decision };
+    },
+    clear: async () => {
+      if (isElectron) return window.bmadAPI.context.clear();
+      return { success: true };
+    },
+  },
+
+  // Coordination (Delegation, Pipeline, Party Mode)
+  coord: {
+    delegate: async (fromSessionId, targetAgent, question, options) => {
+      if (isElectron) return window.bmadAPI.coord.delegate(fromSessionId, targetAgent, question, options);
+      return { agentName: targetAgent, agentTitle: targetAgent, agentIcon: '🤖', question, response: '[Mode navigateur] Réponse simulée', usage: {} };
+    },
+    pipelineTemplates: async () => {
+      if (isElectron) return window.bmadAPI.coord.pipelineTemplates();
+      return [];
+    },
+    listPipelines: async () => {
+      if (isElectron) return window.bmadAPI.coord.listPipelines();
+      return [];
+    },
+    pipelineStatus: async (pipelineId) => {
+      if (isElectron) return window.bmadAPI.coord.pipelineStatus(pipelineId);
+      return null;
+    },
+    executePipeline: async (pipeline, options) => {
+      if (isElectron) return window.bmadAPI.coord.executePipeline(pipeline, options);
+      return { id: 'mock', status: 'completed', results: [] };
+    },
+    onPipelineStepStart: (callback) => {
+      if (isElectron) return window.bmadAPI.coord.onPipelineStepStart(callback);
+      return () => {};
+    },
+    onPipelineStepDone: (callback) => {
+      if (isElectron) return window.bmadAPI.coord.onPipelineStepDone(callback);
+      return () => {};
+    },
+    onPipelineStepError: (callback) => {
+      if (isElectron) return window.bmadAPI.coord.onPipelineStepError(callback);
+      return () => {};
+    },
+    startParty: async (agentNames) => {
+      if (isElectron) return window.bmadAPI.coord.startParty(agentNames);
+      return { partyId: 'mock', agents: [], greeting: 'Mode navigateur', messageCount: 0 };
+    },
+    sendPartyMessage: async (partyId, message, options) => {
+      if (isElectron) return window.bmadAPI.coord.sendPartyMessage(partyId, message, options);
+      return { responses: [], messageCount: 0 };
+    },
+    getPartySession: async (partyId) => {
+      if (isElectron) return window.bmadAPI.coord.getPartySession(partyId);
+      return null;
+    },
+    endParty: async (partyId) => {
+      if (isElectron) return window.bmadAPI.coord.endParty(partyId);
+      return { success: true };
+    },
+    listPartySessions: async () => {
+      if (isElectron) return window.bmadAPI.coord.listPartySessions();
+      return [];
+    },
+  },
 };
 
 export default api;

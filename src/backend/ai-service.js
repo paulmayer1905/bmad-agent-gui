@@ -819,6 +819,7 @@ class AIService {
     this.maxTokens = 4096;
     this.ollamaUrl = 'http://localhost:11434';
     this.conversations = new Map();
+    this.projectContext = null; // Set by BMADBackend after init
   }
 
   async initialize() {
@@ -1120,6 +1121,12 @@ When modifying SVGs: preserve existing group IDs and layer names, maintain the v
 IMPORTANT: Make SVGs detailed and professional. Use proper typography, spacing, and visual hierarchy.`;
     }
 
+    // Inject project context if available
+    let sharedContext = '';
+    if (this.projectContext) {
+      sharedContext = this.projectContext.buildContextForAgent(agentName);
+    }
+
     return `You are operating as a BMAD-METHOD agent. Your complete agent definition follows below.
 Read it carefully and adopt the persona, role, and behavior described.
 
@@ -1131,7 +1138,9 @@ IMPORTANT RULES:
 - When referencing tasks or checklists, describe them clearly
 - You are running inside the BMAD Agent GUI desktop application
 - When you generate code blocks (SVG, HTML, CSS, JSON, etc.), the user can export them as files directly from the chat
+- You can reference artifacts and decisions from the shared project context below
 ${figmaInstructions}
+${sharedContext}
 --- AGENT DEFINITION START ---
 ${agentDefinition}
 --- AGENT DEFINITION END ---

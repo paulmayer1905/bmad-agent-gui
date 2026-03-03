@@ -6,6 +6,7 @@ const navItems = [
   { section: 'Actions' },
   { path: '/', icon: '🏠', label: 'Accueil' },
   { path: '/chat', icon: '💬', label: 'Discuter', highlight: true },
+  { path: '/collaboration', icon: '🎉', label: 'Collaboration', highlight: true },
   { path: '/agents', icon: '🤖', label: 'Agents' },
   { section: 'Ressources' },
   { path: '/tasks', icon: '📝', label: 'Tâches' },

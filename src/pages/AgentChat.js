@@ -148,6 +148,10 @@ export default function AgentChat() {
   const [agentsLoaded, setAgentsLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [showDelegation, setShowDelegation] = useState(false);
+  const [delegating, setDelegating] = useState(false);
+  const [delegationTarget, setDelegationTarget] = useState(null);
+  const [delegationQuestion, setDelegationQuestion] = useState('');
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -327,6 +331,47 @@ export default function AgentChat() {
     setError(null);
     setUploadedFiles([]);
     autoStarted.current = false;
+  };
+
+  // ─── Delegation handler ───────────────────────────────────────────────
+  const handleDelegate = async () => {
+    if (!delegationTarget || !delegationQuestion.trim() || delegating) return;
+    setDelegating(true);
+    setError(null);
+
+    // Show delegation request in chat
+    const targetMeta = agents.find(a => a.name === delegationTarget);
+    setMessages(prev => [...prev, {
+      role: 'system',
+      content: `🤝 Consultation de ${targetMeta?.icon || '🤖'} ${targetMeta?.title || delegationTarget}...`,
+      timestamp: Date.now()
+    }]);
+
+    try {
+      const result = await api.coord.delegate(
+        session?.sessionId || null,
+        delegationTarget,
+        delegationQuestion.trim(),
+        { saveAsArtifact: true }
+      );
+
+      // Show delegation response in current chat
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `🤝 **Réponse de ${result.agentIcon} ${result.agentTitle}** :\n\n${result.response}`,
+        timestamp: Date.now(),
+        usage: result.usage,
+        isDelegation: true
+      }]);
+
+      setShowDelegation(false);
+      setDelegationTarget(null);
+      setDelegationQuestion('');
+    } catch (err) {
+      setError(`Erreur de délégation : ${err.message}`);
+    } finally {
+      setDelegating(false);
+    }
   };
 
   const handleResumeChat = async (chat) => {
@@ -662,6 +707,9 @@ export default function AgentChat() {
           </div>
         </div>
         <div className="chat-header-actions">
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowDelegation(!showDelegation)} title="Consulter un autre agent">
+            🤝 Consulter
+          </button>
           <label className="chat-stream-toggle" title="Streaming en temps réel">
             <input
               type="checkbox"
@@ -675,6 +723,46 @@ export default function AgentChat() {
           </button>
         </div>
       </div>
+
+      {/* Delegation panel */}
+      {showDelegation && (
+        <div className="delegation-panel">
+          <div className="delegation-header">
+            <span>🤝 Consulter un autre agent</span>
+            <button className="btn btn-ghost btn-xs" onClick={() => setShowDelegation(false)}>✕</button>
+          </div>
+          <div className="delegation-agents">
+            {agents.filter(a => a.name !== selectedAgent).map(a => (
+              <button
+                key={a.name}
+                className={`delegation-agent-btn ${delegationTarget === a.name ? 'active' : ''}`}
+                onClick={() => setDelegationTarget(a.name)}
+              >
+                {a.icon || '🤖'} {a.title || a.name}
+              </button>
+            ))}
+          </div>
+          {delegationTarget && (
+            <div className="delegation-input">
+              <input
+                type="text"
+                placeholder="Quelle question poser à cet agent ?"
+                value={delegationQuestion}
+                onChange={e => setDelegationQuestion(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleDelegate(); }}
+                disabled={delegating}
+              />
+              <button
+                className="btn btn-primary btn-sm"
+                disabled={!delegationQuestion.trim() || delegating}
+                onClick={handleDelegate}
+              >
+                {delegating ? '⏳' : '➤'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Messages area */}
       <div className="chat-messages">
