@@ -312,35 +312,140 @@ class WorkspaceManager {
     const commands = { install: null, dev: null, build: null, start: null };
     const filePaths = workspace.files.map(f => f.path);
 
-    // Check for package.json
+    // ── Node.js / package.json ──────────────────────────────────────────
     if (filePaths.includes('package.json')) {
       commands.install = 'npm install';
       try {
         const pkg = JSON.parse(await fs.readFile(path.join(workspace.path, 'package.json'), 'utf8'));
         const scripts = pkg.scripts || {};
         if (scripts.dev) commands.dev = 'npm run dev';
+        else if (scripts.serve) commands.dev = 'npm run serve';
         else if (scripts.start) commands.dev = 'npm start';
         if (scripts.build) commands.build = 'npm run build';
         if (scripts.start) commands.start = 'npm start';
         if (scripts.electron) commands.start = 'npm run electron';
+        if (scripts['electron:dev']) commands.dev = 'npm run electron:dev';
+        if (scripts['tauri:dev'] || scripts['tauri']) commands.dev = 'npm run tauri dev';
       } catch { /* ignore */ }
     }
 
-    // Python
-    if (filePaths.includes('requirements.txt')) {
-      commands.install = 'pip install -r requirements.txt';
+    // ── Python ───────────────────────────────────────────────────────────
+    if (filePaths.includes('requirements.txt') || filePaths.includes('pyproject.toml') || filePaths.includes('setup.py')) {
+      if (filePaths.includes('requirements.txt')) {
+        commands.install = 'pip install -r requirements.txt';
+      } else if (filePaths.includes('pyproject.toml')) {
+        commands.install = 'pip install -e .';
+      } else {
+        commands.install = 'pip install -e .';
+      }
       if (filePaths.some(f => f.includes('manage.py'))) {
         commands.dev = 'python manage.py runserver';
-      } else if (filePaths.some(f => f.includes('app.py') || f.includes('main.py'))) {
-        commands.dev = 'python app.py';
+      } else if (filePaths.some(f => f.match(/^(app|main|server|run)\.py$/))) {
+        const entry = filePaths.find(f => f.match(/^(app|main|server|run)\.py$/));
+        commands.dev = `python ${entry}`;
+        commands.start = `python ${entry}`;
+      }
+      if (filePaths.includes('setup.py')) {
+        commands.build = 'python setup.py build';
       }
     }
 
-    // Static HTML — just open in browser
-    if (filePaths.includes('index.html') && !filePaths.includes('package.json')) {
+    // ── Rust / Cargo ─────────────────────────────────────────────────────
+    if (filePaths.includes('Cargo.toml')) {
+      commands.install = 'cargo fetch';
+      commands.build = 'cargo build --release';
+      commands.dev = 'cargo run';
+      commands.start = 'cargo run --release';
+    }
+
+    // ── Go ───────────────────────────────────────────────────────────────
+    if (filePaths.includes('go.mod')) {
+      commands.install = 'go mod download';
+      commands.build = 'go build -o app .';
+      commands.dev = 'go run .';
+      commands.start = process.platform === 'win32' ? '.\\app.exe' : './app';
+    }
+
+    // ── Java / Maven ─────────────────────────────────────────────────────
+    if (filePaths.includes('pom.xml')) {
+      const mvn = process.platform === 'win32' ? 'mvn.cmd' : 'mvn';
+      commands.install = `${mvn} install -DskipTests`;
+      commands.build = `${mvn} package`;
+      commands.dev = `${mvn} spring-boot:run`;
+      commands.start = 'java -jar target/*.jar';
+    }
+
+    // ── Java / Gradle ────────────────────────────────────────────────────
+    if (filePaths.includes('build.gradle') || filePaths.includes('build.gradle.kts')) {
+      const gw = process.platform === 'win32' ? '.\\gradlew.bat' : './gradlew';
+      const hasWrapper = filePaths.includes('gradlew') || filePaths.includes('gradlew.bat');
+      const gradle = hasWrapper ? gw : 'gradle';
+      commands.install = `${gradle} dependencies`;
+      commands.build = `${gradle} build`;
+      commands.dev = `${gradle} bootRun`;
+      commands.start = 'java -jar build/libs/*.jar';
+    }
+
+    // ── .NET / C# ────────────────────────────────────────────────────────
+    if (filePaths.some(f => f.endsWith('.csproj') || f.endsWith('.sln'))) {
+      commands.install = 'dotnet restore';
+      commands.build = 'dotnet build --configuration Release';
+      commands.dev = 'dotnet run';
+      commands.start = 'dotnet run --configuration Release';
+    }
+
+    // ── C/C++ / CMake ────────────────────────────────────────────────────
+    if (filePaths.includes('CMakeLists.txt')) {
+      commands.install = 'cmake -B build -S .';
+      commands.build = 'cmake --build build --config Release';
+      commands.dev = 'cmake --build build && ' + (process.platform === 'win32' ? '.\\build\\Debug\\app.exe' : './build/app');
+      commands.start = process.platform === 'win32' ? '.\\build\\Release\\app.exe' : './build/app';
+    }
+
+    // ── C/C++ / Makefile ─────────────────────────────────────────────────
+    if (filePaths.includes('Makefile') && !commands.build) {
+      commands.build = 'make';
+      commands.dev = 'make run';
+      commands.start = 'make run';
+    }
+
+    // ── Flutter / Dart ───────────────────────────────────────────────────
+    if (filePaths.includes('pubspec.yaml')) {
+      commands.install = 'flutter pub get';
+      commands.build = 'flutter build';
+      commands.dev = 'flutter run';
+      commands.start = 'flutter run --release';
+    }
+
+    // ── Ruby / Bundler ───────────────────────────────────────────────────
+    if (filePaths.includes('Gemfile')) {
+      commands.install = 'bundle install';
+      if (filePaths.includes('config.ru') || filePaths.some(f => f.includes('config/application.rb'))) {
+        commands.dev = 'bundle exec rails server';
+        commands.start = 'bundle exec rails server -e production';
+      } else if (filePaths.some(f => f.match(/^(app|server|main)\.rb$/))) {
+        const entry = filePaths.find(f => f.match(/^(app|server|main)\.rb$/));
+        commands.dev = `ruby ${entry}`;
+      }
+    }
+
+    // ── PHP / Composer ───────────────────────────────────────────────────
+    if (filePaths.includes('composer.json')) {
+      commands.install = 'composer install';
+      if (filePaths.includes('artisan')) {
+        commands.dev = 'php artisan serve';
+        commands.start = 'php artisan serve';
+      } else if (filePaths.some(f => f.match(/^(index|server|app)\.php$/))) {
+        commands.dev = 'php -S localhost:8080';
+        commands.start = 'php -S localhost:8080';
+      }
+    }
+
+    // ── Static HTML (fallback) ───────────────────────────────────────────
+    if (filePaths.includes('index.html') && !commands.install && !commands.dev) {
       commands.start = process.platform === 'win32'
         ? `start "" "${path.join(workspace.path, 'index.html')}"`
-        : `open "${path.join(workspace.path, 'index.html')}"`;
+        : `open "${path.join(workspace.path, 'index.html')}"`; 
     }
 
     workspace.commands = commands;
