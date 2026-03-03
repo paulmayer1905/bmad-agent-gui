@@ -85,9 +85,9 @@ export default function Sidebar() {
         <div className="sidebar-health">
           <span className={`health-dot ${health.status === 'healthy' ? '' : health.status === 'degraded' ? 'degraded' : 'error'}`}></span>
           <span>
-            {health.status === 'healthy' ? 'All systems operational' :
-             health.status === 'degraded' ? 'Degraded mode' :
-             health.status === 'checking' ? 'Checking...' : 'Connection error'}
+            {health.status === 'healthy' ? 'Tous les systèmes opérationnels' :
+             health.status === 'degraded' ? 'Mode dégradé' :
+             health.status === 'checking' ? 'Vérification...' : 'Erreur de connexion'}
           </span>
         </div>
       </div>

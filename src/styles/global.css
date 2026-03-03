@@ -1041,6 +1041,16 @@ tbody tr:last-child td {
   padding-left: 10px;
 }
 
+/* Error message in chat */
+.chat-message-error .chat-message-content {
+  color: var(--accent-red-light, #fca5a5);
+}
+
+.chat-message-error {
+  border-left: 3px solid var(--accent-red, #ef4444);
+  background: rgba(239, 68, 68, 0.05);
+}
+
 .chat-message-system {
   justify-content: center;
 }

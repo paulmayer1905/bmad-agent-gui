@@ -54,6 +54,18 @@ function CodeBlockWithExport({ lang, content }) {
   const exportCfg = EXPORT_CONFIG[lang];
   const isSvg = lang === 'svg';
 
+  // Sanitize SVG for safe inline preview (prevent XSS from LLM output)
+  const sanitizeSvg = (svgStr) => {
+    // Remove script tags, event handlers, foreignObject, and dangerous URI schemes
+    return svgStr
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '')
+      .replace(/on\w+\s*=\s*"[^"]*"/gi, '')
+      .replace(/on\w+\s*=\s*'[^']*'/gi, '')
+      .replace(/javascript\s*:/gi, 'blocked:')
+      .replace(/data\s*:\s*text\/html/gi, 'blocked:text/html');
+  };
+
   const handleExport = async () => {
     const defaultName = `wireframe-${Date.now()}.${exportCfg?.ext || 'txt'}`;
     const filters = exportCfg
@@ -84,7 +96,7 @@ function CodeBlockWithExport({ lang, content }) {
         </div>
       </div>
       {isSvg && (
-        <div className="chat-svg-preview" dangerouslySetInnerHTML={{ __html: content }} />
+        <div className="chat-svg-preview" dangerouslySetInnerHTML={{ __html: sanitizeSvg(content) }} />
       )}
       <pre className="chat-code-content"><code>{content}</code></pre>
     </div>

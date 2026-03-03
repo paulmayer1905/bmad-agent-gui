@@ -22,7 +22,7 @@ export default function AgentDetail() {
   }, [name]);
 
   if (loading) {
-    return <div className="page-content"><div className="empty-state pulse">Loading agent...</div></div>;
+    return <div className="page-content"><div className="empty-state pulse">Chargement de l'agent...</div></div>;
   }
 
   if (!agent) {
@@ -30,8 +30,8 @@ export default function AgentDetail() {
       <div className="page-content">
         <div className="empty-state">
           <div className="empty-state-icon">❌</div>
-          <h3>Agent not found</h3>
-          <button className="btn btn-primary" onClick={() => navigate('/agents')}>Back to Agents</button>
+          <h3>Agent introuvable</h3>
+          <button className="btn btn-primary" onClick={() => navigate('/agents')}>Retour aux agents</button>
         </div>
       </div>
     );
@@ -44,7 +44,7 @@ export default function AgentDetail() {
     <>
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <button className="btn btn-ghost" onClick={() => navigate('/agents')}>← Back</button>
+          <button className="btn btn-ghost" onClick={() => navigate('/agents')}>← Retour</button>
           <div>
             <h2>{metadata?.icon || '🤖'} {metadata?.title || agent.title || name}</h2>
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{name}</p>
@@ -54,13 +54,13 @@ export default function AgentDetail() {
               className="btn btn-primary"
               onClick={() => navigate(`/chat/${name}`)}
             >
-              💬 Chat
+              💬 Discuter
             </button>
             <button
               className="btn btn-ghost"
               onClick={() => api.sessions.create(name, {}).then(() => navigate('/sessions'))}
             >
-              🚀 Start Session
+              🚀 Démarrer une session
             </button>
           </div>
         </div>
@@ -69,9 +69,9 @@ export default function AgentDetail() {
       <div className="page-content animate-in">
         {/* Tabs */}
         <div className="tabs">
-          <button className={`tab ${tab === 'overview' ? 'active' : ''}`} onClick={() => setTab('overview')}>Overview</button>
-          <button className={`tab ${tab === 'raw' ? 'active' : ''}`} onClick={() => setTab('raw')}>Raw Definition</button>
-          {agent.commands && <button className={`tab ${tab === 'commands' ? 'active' : ''}`} onClick={() => setTab('commands')}>Commands</button>}
+          <button className={`tab ${tab === 'overview' ? 'active' : ''}`} onClick={() => setTab('overview')}>Vue d'ensemble</button>
+          <button className={`tab ${tab === 'raw' ? 'active' : ''}`} onClick={() => setTab('raw')}>Définition brute</button>
+          {agent.commands && <button className={`tab ${tab === 'commands' ? 'active' : ''}`} onClick={() => setTab('commands')}>Commandes</button>}
           {sectionNames.length > 0 && <button className={`tab ${tab === 'sections' ? 'active' : ''}`} onClick={() => setTab('sections')}>Sections</button>}
         </div>
 
@@ -80,11 +80,11 @@ export default function AgentDetail() {
             <div>
               {/* Metadata */}
               <div className="card" style={{ marginBottom: 16 }}>
-                <h3 style={{ marginBottom: 16 }}>Agent Information</h3>
+                <h3 style={{ marginBottom: 16 }}>Informations de l'agent</h3>
                 <div style={{ display: 'grid', gap: 12 }}>
                   {metadata?.whenToUse && (
                     <div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>When to Use</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Quand l'utiliser</div>
                       <div style={{ fontSize: 14 }}>{metadata.whenToUse}</div>
                     </div>
                   )}
@@ -106,7 +106,7 @@ export default function AgentDetail() {
               {/* Dependencies */}
               {metadata?.dependencies && Object.keys(metadata.dependencies).length > 0 && (
                 <div className="card">
-                  <h3 style={{ marginBottom: 12 }}>Dependencies</h3>
+                  <h3 style={{ marginBottom: 12 }}>Dépendances</h3>
                   {Object.entries(metadata.dependencies).map(([cat, items]) => (
                     <div key={cat} style={{ marginBottom: 12 }}>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>{cat}</div>
@@ -129,7 +129,7 @@ export default function AgentDetail() {
               {/* Commands */}
               {agent.commands && (
                 <div className="card">
-                  <h3 style={{ marginBottom: 12 }}>Available Commands</h3>
+                  <h3 style={{ marginBottom: 12 }}>Commandes disponibles</h3>
                   <div style={{ display: 'grid', gap: 8 }}>
                     {(Array.isArray(agent.commands) ? agent.commands : Object.entries(agent.commands)).map((cmd, i) => {
                       const cmdName = Array.isArray(cmd) ? cmd[0] : (typeof cmd === 'string' ? cmd : cmd.name || cmd);
@@ -157,13 +157,13 @@ export default function AgentDetail() {
 
         {tab === 'raw' && (
           <div className="code-block">
-            {agent.rawContent || 'No raw content available.'}
+            {agent.rawContent || 'Aucun contenu brut disponible.'}
           </div>
         )}
 
         {tab === 'commands' && agent.commands && (
           <div className="card">
-            <h3 style={{ marginBottom: 16 }}>All Commands</h3>
+            <h3 style={{ marginBottom: 16 }}>Toutes les commandes</h3>
             <pre style={{ fontFamily: 'var(--font-mono)', fontSize: 13, whiteSpace: 'pre-wrap' }}>
               {JSON.stringify(agent.commands, null, 2)}
             </pre>

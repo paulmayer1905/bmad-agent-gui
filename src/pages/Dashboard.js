@@ -125,29 +125,32 @@ export default function Dashboard() {
           <div style={{ marginBottom: 28 }}>
             <h3 style={{ marginBottom: 12, fontSize: 16 }}>💬 Conversations en cours</h3>
             <div style={{ display: 'grid', gap: 8 }}>
-              {activeChats.map(chat => (
+              {activeChats.map(chat => {
+                const agentMeta = agents.find(a => a.name === chat.agentName);
+                return (
                 <div
-                  key={chat.sessionId || chat.agent}
+                  key={chat.sessionId}
                   className="card card-clickable"
-                  onClick={() => navigate(`/chat/${chat.agent}`)}
+                  onClick={() => navigate(`/chat/${chat.agentName}`)}
                   style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
                   <div style={{
                     width: 40, height: 40, borderRadius: '50%',
-                    background: agentColors[chat.agent] || 'var(--bg-tertiary)',
+                    background: agentColors[chat.agentName] || 'var(--bg-tertiary)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20
                   }}>
-                    {chat.icon || '🤖'}
+                    {agentMeta?.icon || '🤖'}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{chat.title || chat.agent}</div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{agentMeta?.title || chat.agentName}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                       {chat.messageCount ? `${chat.messageCount} messages` : 'Conversation active'}
                     </div>
                   </div>
                   <span style={{ fontSize: 13, color: 'var(--accent-purple)' }}>Reprendre →</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
