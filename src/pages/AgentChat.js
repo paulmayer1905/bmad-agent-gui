@@ -339,15 +339,20 @@ export default function AgentChat() {
 
           if (result.success) {
             // Add a visual message in the chat showing the upload
-            const icon = result.fileType === 'image' ? '🖼️'
+            const icon = result.fileType === 'figma' ? '🎨'
+              : result.fileType === 'image' ? '🖼️'
               : result.fileType === 'pdf' ? '📄'
               : result.fileType === 'docx' ? '📝'
               : result.fileType === 'office' ? '📊'
               : '📎';
 
+            const figmaNote = result.fileType === 'figma'
+              ? '\n💡 SVG chargé dans le contexte — demandez à l\'agent de l\'analyser ou le modifier'
+              : '';
+
             setMessages(prev => [...prev, {
               role: 'user',
-              content: `${icon} Fichier uploadé : **${result.fileName}** (${result.fileType}, ${(result.size / 1024).toFixed(0)} KB)${result.note ? '\n⚠️ ' + result.note : ''}`,
+              content: `${icon} Fichier uploadé : **${result.fileName}** (${result.fileType}, ${(result.size / 1024).toFixed(0)} KB)${result.note ? '\n⚠️ ' + result.note : ''}${figmaNote}`,
               timestamp: Date.now(),
               isFile: true,
               fileInfo: result,
@@ -714,7 +719,7 @@ export default function AgentChat() {
             className="chat-upload-btn"
             onClick={handleUploadFile}
             disabled={loading || uploading}
-            title="Ajouter un fichier (PDF, image, texte, code, Word...)"
+            title="Ajouter un fichier (SVG Figma, PDF, image, texte, code, Word...)"
           >
             {uploading ? '⏳' : '📎'}
           </button>
@@ -738,7 +743,7 @@ export default function AgentChat() {
           </button>
         </div>
         <div className="chat-input-hint">
-          Entrée pour envoyer · Shift+Entrée pour un retour à la ligne · 📎 pour joindre un fichier
+          Entrée pour envoyer · Shift+Entrée pour un retour à la ligne · 📎 pour joindre un fichier (SVG Figma, PDF, code...)
         </div>
       </div>
     </div>

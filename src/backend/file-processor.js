@@ -15,6 +15,8 @@ const FILE_TYPES = {
          '.dockerfile', '.makefile', '.gradle', '.r', '.swift', '.kt', '.scala',
          '.lua', '.pl', '.ex', '.exs', '.clj', '.hs', '.erl', '.dart', '.vue',
          '.svelte', '.astro'],
+  // Figma exports & design files (SVG is text/XML, directly editable)
+  figma: ['.svg'],
   image: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'],
   pdf: ['.pdf'],
   docx: ['.docx'],
@@ -113,6 +115,33 @@ async function processFile(filePath) {
       } catch {
         return { fileName, fileType, size, error: `Impossible de lire le fichier : ${err.message}` };
       }
+    }
+  }
+
+  // ─── Figma / SVG files ──────────────────────────────────────────────
+  if (fileType === 'figma') {
+    if (size > MAX_TEXT_SIZE) {
+      return { fileName, fileType, size, error: `Fichier SVG trop volumineux (${(size / 1024 / 1024).toFixed(1)} MB, max 10 MB)` };
+    }
+    try {
+      const content = await fs.readFile(filePath, 'utf8');
+      // Detect if it's a Figma export by looking for Figma-specific markers
+      const isFigmaExport = content.includes('figma') || content.includes('Figma')
+        || content.includes('data-figma') || content.includes('sketch:');
+      return {
+        fileName,
+        fileType: 'figma',
+        mimeType: 'image/svg+xml',
+        textContent: content,
+        size,
+        lineCount: content.split('\n').length,
+        isFigmaExport,
+        note: isFigmaExport ? 'Export Figma détecté' : 'Fichier SVG (compatible Figma)',
+        // Count SVG elements for context
+        elementCount: (content.match(/<(rect|circle|ellipse|line|polyline|polygon|path|text|g|use|image)[ >]/g) || []).length,
+      };
+    } catch (err) {
+      return { fileName, fileType, size, error: `Impossible de lire le SVG : ${err.message}` };
     }
   }
 
@@ -242,6 +271,18 @@ function formatFileForLLM(processed) {
     return processed.textContent;
   }
 
+  // ─── Figma / SVG files: special formatting ─────────────────────────
+  if (processed.fileType === 'figma') {
+    const header = [];
+    header.push(`🎨 Export Figma/SVG : ${processed.fileName}`);
+    if (processed.elementCount) header.push(`Éléments SVG : ${processed.elementCount}`);
+    if (processed.lineCount) header.push(`Lignes : ${processed.lineCount}`);
+    if (processed.size) header.push(`Taille : ${(processed.size / 1024).toFixed(0)} KB`);
+    if (processed.note) header.push(`ℹ️ ${processed.note}`);
+
+    return `${header.join(' | ')}\n\n📐 **FICHIER SVG UPLOADÉ** — L'utilisateur souhaite que tu analyses et/ou modifies ce design. Fournis ta version modifiée dans un bloc \`\`\`svg.\n\n\`\`\`svg\n${processed.textContent}\n\`\`\``;
+  }
+
   const header = [];
   header.push(`📎 Fichier : ${processed.fileName}`);
   if (processed.pageCount) header.push(`Pages : ${processed.pageCount}`);
@@ -256,7 +297,7 @@ function formatFileForLLM(processed) {
     '.html': 'html', '.css': 'css', '.json': 'json', '.yaml': 'yaml',
     '.yml': 'yaml', '.xml': 'xml', '.sql': 'sql', '.sh': 'bash',
     '.md': 'markdown', '.rb': 'ruby', '.php': 'php', '.swift': 'swift',
-    '.kt': 'kotlin', '.dart': 'dart', '.vue': 'vue',
+    '.kt': 'kotlin', '.dart': 'dart', '.vue': 'vue', '.svg': 'svg',
   }[ext] || '';
 
   return `${header.join(' | ')}\n\`\`\`${lang}\n${processed.textContent}\n\`\`\``;
@@ -274,6 +315,10 @@ function getDialogFilters() {
     {
       name: 'Documents texte',
       extensions: FILE_TYPES.text.map(e => e.slice(1))
+    },
+    {
+      name: 'Figma / SVG',
+      extensions: ['svg']
     },
     {
       name: 'Images',

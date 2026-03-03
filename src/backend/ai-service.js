@@ -1106,6 +1106,17 @@ You can also generate:
 - HTML/CSS prototypes (wrapped in \`\`\`html code blocks)
 - Design token files (JSON format for Figma Tokens plugin)
 
+FIGMA EXPORT UPLOAD & MODIFICATION:
+The user can upload SVG files exported from Figma (via the 📎 button). When a SVG file is uploaded:
+1. Analyze the structure: groups, layers, elements, colors, typography, layout
+2. Provide a clear description of what you see in the design
+3. Ask what modifications the user wants (unless they already specified)
+4. Generate a MODIFIED version in a new \`\`\`svg code block, preserving the original structure/IDs where possible
+5. Explain what you changed so the user can verify
+6. Keep Figma-compatible structure (named groups, viewBox, etc.)
+
+When modifying SVGs: preserve existing group IDs and layer names, maintain the viewBox dimensions unless asked to change them, and ensure the output stays Figma-importable.
+
 IMPORTANT: Make SVGs detailed and professional. Use proper typography, spacing, and visual hierarchy.`;
     }
 
@@ -1279,6 +1290,21 @@ You are now ${agentName}. Greet the user briefly and await their instructions.`;
           fileName: processed.fileName,
           mimeType: processed.mimeType,
           base64Data: processed.base64Data,
+        });
+      }
+    }
+
+    // For Figma/SVG uploads, add modification instructions if this is the UX agent
+    if (processed.fileType === 'figma') {
+      const isUxAgent = conversation.agentName?.includes('ux') || conversation.systemPrompt?.includes('UX Expert');
+      if (isUxAgent) {
+        // Store SVG content for reference
+        if (!conversation.pendingFiles) conversation.pendingFiles = [];
+        conversation.pendingFiles.push({
+          type: 'figma-svg',
+          fileName: processed.fileName,
+          mimeType: 'image/svg+xml',
+          elementCount: processed.elementCount || 0,
         });
       }
     }
