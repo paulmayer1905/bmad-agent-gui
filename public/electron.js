@@ -281,6 +281,7 @@ function registerIpcHandlers() {
     }
     return { success: false };
   });
+  safeHandle('workspace:createShortcut', (_, id, options) => backend.createDesktopShortcut(id, options));
 
   // Streaming chat (uses IPC events instead of invoke)
   ipcMain.on('chat:stream', async (event, sessionId, message) => {

@@ -2469,3 +2469,18 @@ tbody tr:last-child td {
   font-size: 13px;
 }
 
+/* Shortcut button */
+.ws-shortcut-btn {
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 4px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.ws-shortcut-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.ws-shortcut-btn:active { transform: translateY(0); }
+

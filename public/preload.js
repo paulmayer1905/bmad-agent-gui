@@ -150,6 +150,7 @@ contextBridge.exposeInMainWorld('bmadAPI', {
     detectCommands: (id) => ipcRenderer.invoke('workspace:detectCommands', id),
     getPath: (id) => ipcRenderer.invoke('workspace:getPath', id),
     openFolder: (id) => ipcRenderer.invoke('workspace:openFolder', id),
+    createShortcut: (id, options) => ipcRenderer.invoke('workspace:createShortcut', id, options),
     onFilesWritten: (callback) => {
       ipcRenderer.on('pipeline:files:written', (_, data) => callback(data));
       return () => ipcRenderer.removeAllListeners('pipeline:files:written');

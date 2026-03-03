@@ -344,6 +344,10 @@ const api = {
       if (isElectron) return window.bmadAPI.workspace.openFolder(id);
       return { success: false };
     },
+    createShortcut: async (id, options = {}) => {
+      if (isElectron) return window.bmadAPI.workspace.createShortcut(id, options);
+      return { success: false, error: 'Not available in browser mode' };
+    },
     onFilesWritten: (callback) => {
       if (isElectron) return window.bmadAPI.workspace.onFilesWritten(callback);
       return () => {};

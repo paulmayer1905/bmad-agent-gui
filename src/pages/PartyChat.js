@@ -406,6 +406,40 @@ export default function PartyChat() {
     await api.workspace.openFolder(activeWorkspace.id);
   };
 
+  const handleCreateShortcut = async () => {
+    if (!activeWorkspace) return;
+    try {
+      // Determine shortcut type based on workspace
+      const options = {};
+      const cmds = wsCommands || {};
+
+      // If there's a dev/start command → likely a web app, detect URL
+      if (cmds.dev || cmds.start) {
+        const cmd = cmds.dev || cmds.start;
+        const isWeb = cmd.includes('npm') || cmd.includes('python') || cmd.includes('php') ||
+                      cmd.includes('flask') || cmd.includes('django') || cmd.includes('serve');
+        if (isWeb && activeWorkspace.type !== 'desktop') {
+          // Guess the URL from common frameworks
+          let port = '3000';
+          if (cmd.includes('flask') || cmd.includes('django')) port = '8000';
+          else if (cmd.includes('php')) port = '8080';
+          else if (cmd.includes('vite') || cmd.includes('nuxt')) port = '5173';
+          options.url = `http://localhost:${port}`;
+        }
+      }
+
+      const result = await api.workspace.createShortcut(activeWorkspace.id, options);
+      if (result.success) {
+        const typeLabel = result.type === 'url' ? 'raccourci web' : result.type === 'lnk' ? 'raccourci' : 'lanceur';
+        setCommandOutput({ stdout: `✅ ${typeLabel} créé sur le bureau:\n${result.path}`, stderr: '', exitCode: 0 });
+      } else {
+        setCommandOutput({ stdout: '', stderr: result.error || 'Échec de la création du raccourci', exitCode: 1 });
+      }
+    } catch (err) {
+      setCommandOutput({ stdout: '', stderr: err.message, exitCode: 1 });
+    }
+  };
+
   const handleDeleteWorkspace = async (id) => {
     await api.workspace.delete(id);
     if (activeWorkspace?.id === id) {
@@ -760,6 +794,7 @@ export default function PartyChat() {
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button className="btn btn-ghost btn-sm" onClick={handleOpenFolder}>📂 Ouvrir</button>
+                    <button className="btn btn-sm ws-shortcut-btn" onClick={handleCreateShortcut}>🖥️ Raccourci bureau</button>
                   </div>
                 </div>
 

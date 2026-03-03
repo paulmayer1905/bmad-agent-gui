@@ -544,7 +544,193 @@ class WorkspaceManager {
       return a.name.localeCompare(b.name);
     });
   }
+  // ─── Desktop shortcut ──────────────────────────────────────────────
 
+  /**
+   * Create a desktop shortcut for the project.
+   * - For web apps: .url shortcut pointing to localhost URL
+   * - For desktop apps: .lnk shortcut pointing to the executable
+   * - Fallback: .lnk shortcut that opens the project folder
+   * @param {string} workspaceId
+   * @param {object} options - { url, exePath, iconPath }
+   */
+  async createDesktopShortcut(workspaceId, options = {}) {
+    const workspace = this.workspaces.get(workspaceId);
+    if (!workspace) throw new Error('WORKSPACE_NOT_FOUND');
+
+    const desktop = path.join(os.homedir(), 'Desktop');
+    const safeName = workspace.name.replace(/[^a-zA-Z0-9_ -]/g, '-');
+
+    // ── Web app: create .url shortcut ────────────────────────────────
+    if (options.url) {
+      const shortcutPath = path.join(desktop, `${safeName}.url`);
+      const urlContent = `[InternetShortcut]\nURL=${options.url}\n`;
+      // Add icon if available
+      let content = urlContent;
+      if (options.iconPath && fsSync.existsSync(options.iconPath)) {
+        content += `IconFile=${options.iconPath}\nIconIndex=0\n`;
+      }
+      await fs.writeFile(shortcutPath, content, 'utf8');
+      return { success: true, type: 'url', path: shortcutPath };
+    }
+
+    // ── Desktop app: create .lnk shortcut (Windows only) ─────────────
+    if (process.platform === 'win32') {
+      const shortcutPath = path.join(desktop, `${safeName}.lnk`);
+
+      // Determine target: explicit exe, or auto-detect in workspace
+      let targetExe = options.exePath || null;
+      if (!targetExe) {
+        targetExe = await this._findExecutable(workspace);
+      }
+
+      // Determine icon
+      let iconLocation = options.iconPath || '';
+      if (!iconLocation) {
+        iconLocation = await this._findIcon(workspace) || targetExe || '';
+      }
+
+      if (targetExe) {
+        // Create .lnk via PowerShell WScript.Shell COM
+        const ps = `
+          $ws = New-Object -ComObject WScript.Shell;
+          $s = $ws.CreateShortcut('${shortcutPath.replace(/'/g, "''")}');
+          $s.TargetPath = '${targetExe.replace(/'/g, "''")}'; 
+          $s.WorkingDirectory = '${workspace.path.replace(/'/g, "''")}'; 
+          $s.Description = '${safeName} - BMAD Project'; 
+          ${iconLocation ? `$s.IconLocation = '${iconLocation.replace(/'/g, "''")}';` : ''}
+          $s.Save();
+        `.replace(/\n\s+/g, ' ');
+
+        try {
+          execSync(`powershell -NoProfile -Command "${ps}"`, { timeout: 10000 });
+          return { success: true, type: 'lnk', path: shortcutPath };
+        } catch (err) {
+          return { success: false, error: err.message };
+        }
+      }
+
+      // Fallback: shortcut to project folder
+      const ps = `
+        $ws = New-Object -ComObject WScript.Shell;
+        $s = $ws.CreateShortcut('${shortcutPath.replace(/'/g, "''")}');
+        $s.TargetPath = '${workspace.path.replace(/'/g, "''")}'; 
+        $s.Description = '${safeName} - BMAD Project'; 
+        $s.Save();
+      `.replace(/\n\s+/g, ' ');
+
+      try {
+        execSync(`powershell -NoProfile -Command "${ps}"`, { timeout: 10000 });
+        return { success: true, type: 'folder', path: shortcutPath };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    }
+
+    // macOS / Linux: create a .desktop or alias
+    if (process.platform === 'darwin') {
+      // Create a simple shell alias script
+      const scriptPath = path.join(desktop, `${safeName}.command`);
+      const targetExe = options.exePath || await this._findExecutable(workspace);
+      const script = targetExe
+        ? `#!/bin/bash\ncd "${workspace.path}"\n"${targetExe}"\n`
+        : `#!/bin/bash\nopen "${workspace.path}"\n`;
+      await fs.writeFile(scriptPath, script, 'utf8');
+      await fs.chmod(scriptPath, 0o755);
+      return { success: true, type: 'command', path: scriptPath };
+    }
+
+    // Linux .desktop file
+    const desktopPath = path.join(desktop, `${safeName}.desktop`);
+    const targetExe = options.exePath || await this._findExecutable(workspace);
+    const icon = options.iconPath || await this._findIcon(workspace) || '';
+    const entry = [
+      '[Desktop Entry]',
+      'Type=Application',
+      `Name=${workspace.name}`,
+      `Comment=${safeName} - BMAD Project`,
+      `Exec=${targetExe || `xdg-open "${workspace.path}"`}`,
+      `Path=${workspace.path}`,
+      icon ? `Icon=${icon}` : '',
+      'Terminal=false',
+    ].filter(Boolean).join('\n');
+    await fs.writeFile(desktopPath, entry + '\n', 'utf8');
+    await fs.chmod(desktopPath, 0o755);
+    return { success: true, type: 'desktop', path: desktopPath };
+  }
+
+  /**
+   * Find an executable in the workspace (built app, Electron, etc.)
+   */
+  async _findExecutable(workspace) {
+    const candidates = [
+      // Electron packaged output
+      'dist/**/*.exe', 'out/**/*.exe', 'release/**/*.exe',
+      // Go / Rust / C built binaries
+      'build/Release/*.exe', 'target/release/*.exe',
+      'build/*.exe', '*.exe',
+    ];
+    // Simple search: look for .exe files recursively (max 2 levels deep)
+    try {
+      const files = await this._findFiles(workspace.path, '.exe', 3);
+      if (files.length > 0) return files[0];
+    } catch { /* ignore */ }
+
+    // Check if it's a Node project that can be launched via node/npm
+    const pkgPath = path.join(workspace.path, 'package.json');
+    if (fsSync.existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8'));
+        if (pkg.main) {
+          // Return node as the launcher
+          return process.execPath; // node.exe itself
+        }
+      } catch { /* ignore */ }
+    }
+    return null;
+  }
+
+  /**
+   * Find an icon file in the workspace (.ico, .png, .svg)
+   */
+  async _findIcon(workspace) {
+    const iconExts = ['.ico', '.png', '.svg'];
+    for (const ext of iconExts) {
+      try {
+        const files = await this._findFiles(workspace.path, ext, 3);
+        // Prefer files named icon, logo, favicon
+        const preferred = files.find(f => {
+          const name = path.basename(f).toLowerCase();
+          return name.includes('icon') || name.includes('logo') || name.includes('favicon');
+        });
+        if (preferred) return preferred;
+        if (files.length > 0) return files[0];
+      } catch { /* ignore */ }
+    }
+    return null;
+  }
+
+  /**
+   * Find files with a given extension recursively (limited depth)
+   */
+  async _findFiles(dir, ext, maxDepth, depth = 0) {
+    if (depth >= maxDepth) return [];
+    const results = [];
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (['node_modules', '.git', '__pycache__', 'venv', '.venv'].includes(entry.name)) continue;
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          const sub = await this._findFiles(full, ext, maxDepth, depth + 1);
+          results.push(...sub);
+        } else if (entry.name.endsWith(ext)) {
+          results.push(full);
+        }
+      }
+    } catch { /* ignore */ }
+    return results;
+  }
   // ─── Internal ──────────────────────────────────────────────────────────
 
   async _saveMeta(workspace) {

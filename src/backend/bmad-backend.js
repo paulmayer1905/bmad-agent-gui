@@ -625,6 +625,10 @@ class BMADBackend {
     return this._workspaceManager.getWorkspacePath(id);
   }
 
+  async createDesktopShortcut(workspaceId, options) {
+    return await this._workspaceManager.createDesktopShortcut(workspaceId, options);
+  }
+
   // ─── System ─────────────────────────────────────────────────────────────
   async getSystemInfo() {
     return {
