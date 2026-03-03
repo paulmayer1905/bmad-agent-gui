@@ -2,6 +2,121 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api';
 
+// ─── Code block detection & export ────────────────────────────────────────
+const CODE_BLOCK_REGEX = /```(\w*)\n([\s\S]*?)```/g;
+
+const EXPORT_CONFIG = {
+  svg: { icon: '🎨', label: 'Exporter SVG (Figma)', ext: 'svg', mime: 'image/svg+xml' },
+  html: { icon: '🌐', label: 'Exporter HTML', ext: 'html', mime: 'text/html' },
+  css: { icon: '🎨', label: 'Exporter CSS', ext: 'css', mime: 'text/css' },
+  json: { icon: '📋', label: 'Exporter JSON', ext: 'json', mime: 'application/json' },
+  yaml: { icon: '📋', label: 'Exporter YAML', ext: 'yaml', mime: 'text/yaml' },
+  yml: { icon: '📋', label: 'Exporter YAML', ext: 'yaml', mime: 'text/yaml' },
+  javascript: { icon: '📜', label: 'Exporter JS', ext: 'js', mime: 'text/javascript' },
+  js: { icon: '📜', label: 'Exporter JS', ext: 'js', mime: 'text/javascript' },
+  typescript: { icon: '📜', label: 'Exporter TS', ext: 'ts', mime: 'text/typescript' },
+  ts: { icon: '📜', label: 'Exporter TS', ext: 'ts', mime: 'text/typescript' },
+  python: { icon: '🐍', label: 'Exporter Python', ext: 'py', mime: 'text/x-python' },
+  py: { icon: '🐍', label: 'Exporter Python', ext: 'py', mime: 'text/x-python' },
+  xml: { icon: '📄', label: 'Exporter XML', ext: 'xml', mime: 'text/xml' },
+  markdown: { icon: '📝', label: 'Exporter Markdown', ext: 'md', mime: 'text/markdown' },
+  md: { icon: '📝', label: 'Exporter Markdown', ext: 'md', mime: 'text/markdown' },
+  sql: { icon: '🗃️', label: 'Exporter SQL', ext: 'sql', mime: 'text/sql' },
+};
+
+function parseMessageContent(content) {
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  const regex = new RegExp(CODE_BLOCK_REGEX.source, 'g');
+  while ((match = regex.exec(content)) !== null) {
+    // Text before the code block
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', content: content.slice(lastIndex, match.index) });
+    }
+    parts.push({
+      type: 'code',
+      lang: match[1].toLowerCase() || 'text',
+      content: match[2],
+    });
+    lastIndex = regex.lastIndex;
+  }
+  // Remaining text
+  if (lastIndex < content.length) {
+    parts.push({ type: 'text', content: content.slice(lastIndex) });
+  }
+  return parts;
+}
+
+function CodeBlockWithExport({ lang, content }) {
+  const [copied, setCopied] = useState(false);
+  const exportCfg = EXPORT_CONFIG[lang];
+  const isSvg = lang === 'svg';
+
+  const handleExport = async () => {
+    const defaultName = `wireframe-${Date.now()}.${exportCfg?.ext || 'txt'}`;
+    const filters = exportCfg
+      ? [{ name: exportCfg.label, extensions: [exportCfg.ext] }, { name: 'Tous', extensions: ['*'] }]
+      : [{ name: 'Texte', extensions: ['txt'] }, { name: 'Tous', extensions: ['*'] }];
+    await api.chat.saveFile(content, defaultName, filters);
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="chat-code-block">
+      <div className="chat-code-header">
+        <span className="chat-code-lang">{lang || 'code'}</span>
+        <div className="chat-code-actions">
+          <button className="btn btn-ghost btn-xs" onClick={handleCopy} title="Copier">
+            {copied ? '✅' : '📋'} {copied ? 'Copié' : 'Copier'}
+          </button>
+          {exportCfg && (
+            <button className="btn btn-ghost btn-xs chat-export-btn" onClick={handleExport} title={exportCfg.label}>
+              {exportCfg.icon} {exportCfg.label}
+            </button>
+          )}
+        </div>
+      </div>
+      {isSvg && (
+        <div className="chat-svg-preview" dangerouslySetInnerHTML={{ __html: content }} />
+      )}
+      <pre className="chat-code-content"><code>{content}</code></pre>
+    </div>
+  );
+}
+
+function RichMessageContent({ content }) {
+  const parts = parseMessageContent(content);
+
+  if (parts.length === 1 && parts[0].type === 'text') {
+    // Simple text, render as before
+    return parts[0].content.split('\n').map((line, j) => (
+      <React.Fragment key={j}>
+        {line}
+        {j < parts[0].content.split('\n').length - 1 && <br />}
+      </React.Fragment>
+    ));
+  }
+
+  return parts.map((part, i) => {
+    if (part.type === 'code') {
+      return <CodeBlockWithExport key={i} lang={part.lang} content={part.content} />;
+    }
+    return part.content.split('\n').map((line, j) => (
+      <React.Fragment key={`${i}-${j}`}>
+        {line}
+        {j < part.content.split('\n').length - 1 && <br />}
+      </React.Fragment>
+    ));
+  });
+}
+
 export default function AgentChat() {
   const { agentName } = useParams();
   const [searchParams] = useSearchParams();
@@ -535,12 +650,7 @@ export default function AgentChat() {
             )}
             <div className="chat-message-content">
               <div className="chat-message-text">
-                {msg.content.split('\n').map((line, j) => (
-                  <React.Fragment key={j}>
-                    {line}
-                    {j < msg.content.split('\n').length - 1 && <br />}
-                  </React.Fragment>
-                ))}
+                <RichMessageContent content={msg.content} />
               </div>
               {msg.usage && (
                 <div className="chat-message-meta">

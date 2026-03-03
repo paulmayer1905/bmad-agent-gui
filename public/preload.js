@@ -80,6 +80,7 @@ contextBridge.exposeInMainWorld('bmadAPI', {
     list: () => ipcRenderer.invoke('chat:list'),
     pickFile: () => ipcRenderer.invoke('chat:pick-file'),
     uploadFile: (sessionId, filePath) => ipcRenderer.invoke('chat:upload-file', sessionId, filePath),
+    saveFile: (content, defaultName, filters) => ipcRenderer.invoke('chat:save-file', content, defaultName, filters),
   },
 
   // AI Config

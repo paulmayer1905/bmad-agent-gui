@@ -180,6 +180,23 @@ function registerIpcHandlers() {
     return { canceled: false, filePaths: result.filePaths };
   });
 
+  // Save file from chat (export SVG, code, etc.)
+  safeHandle('chat:save-file', async (_, content, defaultName, filters) => {
+    const fsPromises = require('fs').promises;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Exporter le fichier',
+      defaultPath: defaultName || 'export.svg',
+      filters: filters || [
+        { name: 'SVG (Figma)', extensions: ['svg'] },
+        { name: 'HTML', extensions: ['html'] },
+        { name: 'Tous les fichiers', extensions: ['*'] },
+      ],
+    });
+    if (result.canceled) return { canceled: true };
+    await fsPromises.writeFile(result.filePath, content, 'utf8');
+    return { canceled: false, filePath: result.filePath };
+  });
+
   // Streaming chat (uses IPC events instead of invoke)
   ipcMain.on('chat:stream', async (event, sessionId, message) => {
     try {

@@ -1069,6 +1069,46 @@ class AIService {
   }
 
   buildSystemPrompt(agentDefinition, agentName) {
+    // Detect if this is the UX agent for Figma-specific instructions
+    const isUxAgent = agentDefinition.includes('ux-expert') || agentDefinition.includes('UX Expert') || agentName.toLowerCase().includes('ux');
+
+    let figmaInstructions = '';
+    if (isUxAgent) {
+      figmaInstructions = `
+
+FIGMA-COMPATIBLE DESIGN OUTPUT:
+You have a special capability: generating SVG wireframes and mockups that can be imported directly into Figma.
+
+When the user asks for wireframes, mockups, UI designs, or Figma-compatible output:
+1. Generate complete, well-structured SVG code wrapped in a \`\`\`svg code block
+2. Use proper SVG structure with viewBox, named groups (<g id="...">), and layers
+3. Include text elements with proper font-family (Inter, system-ui, sans-serif)
+4. Use a design system approach:
+   - Rectangles with rounded corners (rx="8") for cards/buttons
+   - Proper spacing (8px grid)
+   - Colors as CSS variables or hex codes with comments
+   - Group related elements in <g> tags with descriptive IDs (e.g., id="header", id="sidebar", id="card-1")
+5. The SVG MUST be self-contained and directly importable into Figma
+6. Each component/section should be a named group so it becomes a layer in Figma
+7. Add a comment at the top: <!-- Figma-compatible wireframe - Import via File > Import -->
+
+Available design patterns you can generate:
+- Full page wireframes (desktop/mobile)
+- Component libraries (buttons, cards, forms, navbars)
+- User flow diagrams
+- Responsive layout grids
+- Icon sets
+- Design tokens visualization
+
+When generating SVGs, ALWAYS remind the user they can download the file and import it into Figma via "File > Place image" or drag-and-drop, and that all groups/layers will be editable.
+
+You can also generate:
+- HTML/CSS prototypes (wrapped in \`\`\`html code blocks)
+- Design token files (JSON format for Figma Tokens plugin)
+
+IMPORTANT: Make SVGs detailed and professional. Use proper typography, spacing, and visual hierarchy.`;
+    }
+
     return `You are operating as a BMAD-METHOD agent. Your complete agent definition follows below.
 Read it carefully and adopt the persona, role, and behavior described.
 
@@ -1079,7 +1119,8 @@ IMPORTANT RULES:
 - Be helpful, concise, and follow your persona's style
 - When referencing tasks or checklists, describe them clearly
 - You are running inside the BMAD Agent GUI desktop application
-
+- When you generate code blocks (SVG, HTML, CSS, JSON, etc.), the user can export them as files directly from the chat
+${figmaInstructions}
 --- AGENT DEFINITION START ---
 ${agentDefinition}
 --- AGENT DEFINITION END ---
