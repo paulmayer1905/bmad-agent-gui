@@ -153,6 +153,12 @@ export default function AgentChat() {
   const [delegationTarget, setDelegationTarget] = useState(null);
   const [delegationQuestion, setDelegationQuestion] = useState('');
 
+  // Documentation project state
+  const [docProjects, setDocProjects] = useState([]);
+  const [activeDocProject, setActiveDocProject] = useState(null);
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [docSavedIndicator, setDocSavedIndicator] = useState(null); // { fileName, agent }
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const autoStarted = useRef(false);
@@ -174,6 +180,21 @@ export default function AgentChat() {
       setAgentsLoaded(true);
     };
     load();
+  }, []);
+
+  // Load doc projects
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const [projects, active] = await Promise.all([
+          api.docProject.list(),
+          api.docProject.getActive(),
+        ]);
+        setDocProjects(projects);
+        if (active) setActiveDocProject(active);
+      } catch { /* ignore */ }
+    };
+    loadProjects();
   }, []);
 
   // Auto-start chat immediately when navigating with an agent name
@@ -317,6 +338,54 @@ export default function AgentChat() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  // ─── Documentation project handlers ─────────────────────────────────
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) return;
+    try {
+      const project = await api.docProject.create({ name: newProjectName.trim() });
+      await api.docProject.setActive(project.id);
+      setActiveDocProject(project);
+      setDocProjects(prev => [project, ...prev]);
+      setNewProjectName('');
+      setShowNewProject(false);
+    } catch (err) {
+      console.error('Failed to create project:', err);
+    }
+  };
+
+  const handleSelectProject = async (project) => {
+    try {
+      const result = await api.docProject.setActive(project.id);
+      setActiveDocProject(result);
+    } catch (err) {
+      console.error('Failed to select project:', err);
+    }
+  };
+
+  const handleNoProject = async () => {
+    setActiveDocProject(null);
+    // Backend: setting to null deactivates auto-save
+    try { await api.docProject.setActive(null); } catch { /* ignore */ }
+  };
+
+  const handleOpenProjectFolder = async () => {
+    if (activeDocProject) {
+      await api.docProject.openFolder(activeDocProject.id);
+    }
+  };
+
+  const handleSaveConversation = async () => {
+    if (session && activeDocProject) {
+      try {
+        const result = await api.docProject.saveConversation(session.sessionId);
+        if (result) {
+          setDocSavedIndicator({ fileName: result.fileName, agent: 'Conversation' });
+          setTimeout(() => setDocSavedIndicator(null), 3000);
+        }
+      } catch { /* ignore */ }
     }
   };
 
@@ -695,6 +764,80 @@ export default function AgentChat() {
   // ─── Render: Chat interface ─────────────────────────────────────────
   return (
     <div className="chat-container">
+      {/* Project documentation bar */}
+      <div className="doc-project-bar">
+        <div className="doc-project-label">📁 Projet :</div>
+        {activeDocProject ? (
+          <div className="doc-project-active">
+            <span className="doc-project-name" title={activeDocProject.path}>
+              {activeDocProject.name}
+            </span>
+            <span className="doc-project-count">{activeDocProject.documentCount || 0} doc(s)</span>
+            <button className="btn btn-ghost btn-xs" onClick={handleOpenProjectFolder} title="Ouvrir le dossier">📂</button>
+            <button className="btn btn-ghost btn-xs" onClick={handleSaveConversation} title="Sauvegarder la conversation" disabled={!session}>💾</button>
+            <select
+              className="doc-project-select"
+              value={activeDocProject.id}
+              onChange={(e) => {
+                if (e.target.value === '__none__') handleNoProject();
+                else if (e.target.value === '__new__') setShowNewProject(true);
+                else {
+                  const p = docProjects.find(p => p.id === e.target.value);
+                  if (p) handleSelectProject(p);
+                }
+              }}
+            >
+              {docProjects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+              <option value="__new__">+ Nouveau projet...</option>
+              <option value="__none__">Aucun projet</option>
+            </select>
+          </div>
+        ) : (
+          <div className="doc-project-none">
+            {showNewProject ? (
+              <div className="doc-project-new-form">
+                <input
+                  type="text"
+                  placeholder="Nom du projet..."
+                  value={newProjectName}
+                  onChange={e => setNewProjectName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleCreateProject(); if (e.key === 'Escape') setShowNewProject(false); }}
+                  autoFocus
+                  className="doc-project-input"
+                />
+                <button className="btn btn-sm" onClick={handleCreateProject}>✓</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowNewProject(false)}>✕</button>
+              </div>
+            ) : (
+              <>
+                <span className="doc-project-hint">Aucun projet actif — les réponses ne sont pas sauvegardées</span>
+                <button className="btn btn-sm doc-project-create-btn" onClick={() => setShowNewProject(true)}>+ Nouveau projet</button>
+                {docProjects.length > 0 && (
+                  <select
+                    className="doc-project-select"
+                    value=""
+                    onChange={(e) => {
+                      const p = docProjects.find(p => p.id === e.target.value);
+                      if (p) handleSelectProject(p);
+                    }}
+                  >
+                    <option value="" disabled>Sélectionner...</option>
+                    {docProjects.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {docSavedIndicator && (
+          <div className="doc-saved-indicator">✅ Sauvegardé: {docSavedIndicator.fileName}</div>
+        )}
+      </div>
+
       {/* Chat header */}
       <div className="chat-header">
         <div className="chat-header-agent">

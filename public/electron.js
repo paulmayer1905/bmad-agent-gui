@@ -155,7 +155,12 @@ function registerIpcHandlers() {
 
   // Chat / AI
   safeHandle('chat:start', (_, agentName) => backend.startChat(agentName));
-  safeHandle('chat:send', (_, sessionId, message) => backend.sendChatMessage(sessionId, message));
+  safeHandle('chat:send', async (_, sessionId, message) => {
+    const result = await backend.sendChatMessage(sessionId, message);
+    // Auto-save to doc project (fire and forget)
+    backend.saveAgentDoc(sessionId, message, result.content).catch(() => {});
+    return result;
+  });
   safeHandle('chat:history', (_, sessionId) => backend.getChatHistory(sessionId));
   safeHandle('chat:clear', (_, sessionId) => backend.clearChat(sessionId));
   safeHandle('chat:list', () => backend.listChats());
@@ -283,6 +288,26 @@ function registerIpcHandlers() {
   });
   safeHandle('workspace:createShortcut', (_, id, options) => backend.createDesktopShortcut(id, options));
 
+  // Documentation Projects
+  safeHandle('doc:project:create', (_, options) => backend.createDocProject(options));
+  safeHandle('doc:project:get', (_, id) => backend.getDocProject(id));
+  safeHandle('doc:project:list', () => backend.listDocProjects());
+  safeHandle('doc:project:delete', (_, id) => backend.deleteDocProject(id));
+  safeHandle('doc:project:setActive', (_, id) => backend.setActiveDocProject(id));
+  safeHandle('doc:project:getActive', () => backend.getActiveDocProject());
+  safeHandle('doc:project:tree', (_, id) => backend.getDocProjectTree(id));
+  safeHandle('doc:file:read', (_, projectId, relativePath) => backend.readDocFile(projectId, relativePath));
+  safeHandle('doc:conversation:save', (_, sessionId) => backend.saveConversationHistory(sessionId));
+  safeHandle('doc:project:open', async (_, id) => {
+    const project = await backend.getDocProject(id);
+    if (project && project.path) {
+      const { shell } = require('electron');
+      await shell.openPath(project.path);
+      return { success: true };
+    }
+    return { success: false };
+  });
+
   // Streaming chat (uses IPC events instead of invoke)
   ipcMain.on('chat:stream', async (event, sessionId, message) => {
     try {
@@ -294,6 +319,8 @@ function registerIpcHandlers() {
       if (!event.sender.isDestroyed()) {
         event.sender.send('chat:stream:done', sessionId, result);
       }
+      // Auto-save to doc project (fire and forget)
+      backend.saveAgentDoc(sessionId, message, result.content).catch(() => {});
     } catch (error) {
       if (!event.sender.isDestroyed()) {
         event.sender.send('chat:stream:error', sessionId, error.message);

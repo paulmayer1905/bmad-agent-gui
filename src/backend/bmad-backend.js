@@ -11,6 +11,7 @@ const AIService = require('./ai-service');
 const ProjectContext = require('./project-context');
 const AgentCoordinator = require('./agent-coordinator');
 const WorkspaceManager = require('./workspace-manager');
+const DocumentationManager = require('./documentation-manager');
 
 class BMADBackend {
   constructor(options = {}) {
@@ -35,6 +36,9 @@ class BMADBackend {
 
     // Workspace manager (real project files on disk)
     this._workspaceManager = new WorkspaceManager();
+
+    // Documentation manager (auto-save agent outputs as doc files)
+    this._docManager = new DocumentationManager();
 
     // Agent coordinator (delegation, pipeline, party mode)
     this._coordinator = null; // initialized after aiService
@@ -72,6 +76,9 @@ class BMADBackend {
 
     // Initialize workspace manager
     await this._workspaceManager.initialize();
+
+    // Initialize documentation manager
+    await this._docManager.initialize();
 
     // Initialize coordinator (delegation, pipeline, party mode)
     this._coordinator = new AgentCoordinator({
@@ -627,6 +634,69 @@ class BMADBackend {
 
   async createDesktopShortcut(workspaceId, options) {
     return await this._workspaceManager.createDesktopShortcut(workspaceId, options);
+  }
+
+  // ─── Documentation Manager ────────────────────────────────────────────
+
+  async createDocProject(options) {
+    return await this._docManager.createProject(options);
+  }
+
+  async getDocProject(id) {
+    return await this._docManager.getProject(id);
+  }
+
+  async listDocProjects() {
+    return await this._docManager.listProjects();
+  }
+
+  async deleteDocProject(id) {
+    return await this._docManager.deleteProject(id);
+  }
+
+  setActiveDocProject(id) {
+    return this._docManager.setActiveProject(id);
+  }
+
+  getActiveDocProject() {
+    return this._docManager.getActiveProject();
+  }
+
+  async getDocProjectTree(projectId) {
+    return await this._docManager.getProjectTree(projectId);
+  }
+
+  async readDocFile(projectId, relativePath) {
+    return await this._docManager.readDocument(projectId, relativePath);
+  }
+
+  /**
+   * Auto-save an agent response as documentation.
+   * Called from IPC after stream:done or chat:send.
+   */
+  async saveAgentDoc(sessionId, userQuestion, responseContent) {
+    const conv = this._aiService.conversations.get(sessionId);
+    if (!conv) return null;
+    const agentName = conv.agentName || 'unknown';
+    return await this._docManager.saveAgentResponse(
+      agentName, agentName, userQuestion, responseContent, { sessionId }
+    );
+  }
+
+  async saveConversationHistory(sessionId) {
+    const conv = this._aiService.conversations.get(sessionId);
+    if (!conv) return null;
+    const agentName = conv.agentName || 'unknown';
+    const messages = conv.messages.map(m => ({
+      role: m.role,
+      content: m.content,
+      timestamp: Date.now()
+    }));
+    return await this._docManager.saveConversationHistory(agentName, agentName, messages, { sessionId });
+  }
+
+  getDocManager() {
+    return this._docManager;
   }
 
   // ─── System ─────────────────────────────────────────────────────────────

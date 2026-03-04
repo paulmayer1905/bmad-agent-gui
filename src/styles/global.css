@@ -733,6 +733,105 @@ tbody tr:last-child td {
   overflow: hidden;
 }
 
+/* ── Documentation Project Bar ─────────────────────────────────────────── */
+.doc-project-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 24px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0;
+  min-height: 36px;
+  flex-wrap: wrap;
+}
+.doc-project-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.doc-project-active {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.doc-project-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-purple-light);
+  cursor: default;
+}
+.doc-project-count {
+  font-size: 10px;
+  background: rgba(124, 58, 237, 0.15);
+  color: var(--accent-purple-light);
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+.doc-project-select {
+  font-size: 11px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  max-width: 180px;
+}
+.doc-project-select:focus { border-color: var(--accent-purple); outline: none; }
+.doc-project-none {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.doc-project-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.doc-project-create-btn {
+  font-size: 11px;
+  background: var(--accent-purple);
+  color: #fff;
+  border: none;
+  padding: 2px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.doc-project-create-btn:hover { opacity: 0.9; }
+.doc-project-new-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.doc-project-input {
+  font-size: 12px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--accent-purple);
+  border-radius: 4px;
+  padding: 2px 8px;
+  width: 200px;
+}
+.doc-project-input:focus { outline: none; }
+.doc-saved-indicator {
+  font-size: 11px;
+  color: var(--accent-green);
+  background: rgba(16, 185, 129, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  animation: fadeInOut 3s ease forwards;
+  margin-left: auto;
+}
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(-4px); }
+  15% { opacity: 1; transform: translateY(0); }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 .chat-header {
   display: flex;
   align-items: center;

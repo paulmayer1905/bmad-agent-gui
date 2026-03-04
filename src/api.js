@@ -353,6 +353,50 @@ const api = {
       return () => {};
     },
   },
+
+  // ─── Documentation Projects ────────────────────────────────────────────
+  docProject: {
+    create: async (options = {}) => {
+      if (isElectron) return window.bmadAPI.docProject.create(options);
+      return { id: 'mock-proj', name: options.name || 'Mock', path: '/mock', documentCount: 0, createdAt: Date.now(), updatedAt: Date.now() };
+    },
+    get: async (id) => {
+      if (isElectron) return window.bmadAPI.docProject.get(id);
+      return null;
+    },
+    list: async () => {
+      if (isElectron) return window.bmadAPI.docProject.list();
+      return [];
+    },
+    delete: async (id) => {
+      if (isElectron) return window.bmadAPI.docProject.delete(id);
+      return { success: false };
+    },
+    setActive: async (id) => {
+      if (isElectron) return window.bmadAPI.docProject.setActive(id);
+      return null;
+    },
+    getActive: async () => {
+      if (isElectron) return window.bmadAPI.docProject.getActive();
+      return null;
+    },
+    tree: async (id) => {
+      if (isElectron) return window.bmadAPI.docProject.tree(id);
+      return [];
+    },
+    readFile: async (projectId, relativePath) => {
+      if (isElectron) return window.bmadAPI.docProject.readFile(projectId, relativePath);
+      return { content: '', size: 0 };
+    },
+    saveConversation: async (sessionId) => {
+      if (isElectron) return window.bmadAPI.docProject.saveConversation(sessionId);
+      return null;
+    },
+    openFolder: async (id) => {
+      if (isElectron) return window.bmadAPI.docProject.openFolder(id);
+      return { success: false };
+    },
+  },
 };
 
 export default api;

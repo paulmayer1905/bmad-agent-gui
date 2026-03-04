@@ -157,6 +157,20 @@ contextBridge.exposeInMainWorld('bmadAPI', {
     },
   },
 
+  // Documentation Projects
+  docProject: {
+    create: (options) => ipcRenderer.invoke('doc:project:create', options),
+    get: (id) => ipcRenderer.invoke('doc:project:get', id),
+    list: () => ipcRenderer.invoke('doc:project:list'),
+    delete: (id) => ipcRenderer.invoke('doc:project:delete', id),
+    setActive: (id) => ipcRenderer.invoke('doc:project:setActive', id),
+    getActive: () => ipcRenderer.invoke('doc:project:getActive'),
+    tree: (id) => ipcRenderer.invoke('doc:project:tree', id),
+    readFile: (projectId, relativePath) => ipcRenderer.invoke('doc:file:read', projectId, relativePath),
+    saveConversation: (sessionId) => ipcRenderer.invoke('doc:conversation:save', sessionId),
+    openFolder: (id) => ipcRenderer.invoke('doc:project:open', id),
+  },
+
   // Navigation events from menu
   onNavigate: (callback) => {
     ipcRenderer.on('navigate', (_, path) => callback(path));
