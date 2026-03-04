@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMAD Agent GUI — Présentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --primary: #6C63FF;
+    --primary-light: #8B85FF;
+    --accent: #00D4AA;
+    --dark: #0F0F1A;
+    --dark2: #16162A;
+    --dark3: #1E1E35;
+    --text: #E8E8F0;
+    --text-muted: #8888A8;
+    --border: rgba(255,255,255,0.08);
+    --card-bg: rgba(255,255,255,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--dark);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 14px;
+  }
+
+  /* ── Cover page ─────────────────────────────────── */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0F0F1A 0%, #1a1040 50%, #0F1A2A 100%);
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    padding: 60px 40px;
+    text-align: center;
+  }
+  .cover::before {
+    content:'';
+    position: absolute;
+    top: -200px; left: -200px;
+    width: 700px; height: 700px;
+    background: radial-gradient(circle, rgba(108,99,255,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cover::after {
+    content:'';
+    position: absolute;
+    bottom: -200px; right: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(0,212,170,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cover-badge {
+    display: inline-block;
+    background: rgba(108,99,255,0.2);
+    border: 1px solid rgba(108,99,255,0.4);
+    color: var(--primary-light);
+    padding: 6px 18px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+  .cover h1 {
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #FFFFFF 0%, #C4BFFF 50%, #00D4AA 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+  }
+  .cover .subtitle {
+    font-size: 20px;
+    color: var(--text-muted);
+    font-weight: 300;
+    margin-bottom: 48px;
+    max-width: 600px;
+  }
+  .cover-meta {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .cover-meta span { display: flex; align-items: center; gap: 8px; }
+  .cover-meta strong { color: var(--text); }
+  .cover-logo {
+    font-size: 80px;
+    margin-bottom: 24px;
+  }
+
+  /* ── Layout ─────────────────────────────────────── */
+  .content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 60px 40px;
+  }
+
+  /* ── Section titles ──────────────────────────────── */
+  .section {
+    margin-bottom: 64px;
+    page-break-inside: avoid;
+  }
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .section-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+  .section h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: white;
+  }
+  .section-divider {
+    height: 1px;
+    background: linear-gradient(90deg, var(--primary) 0%, transparent 60%);
+    margin-bottom: 32px;
+    opacity: 0.4;
+  }
+
+  h3 {
+    font-size: 17px;
+    font-weight: 600;
+    color: white;
+    margin: 28px 0 12px;
+  }
+  p { color: var(--text-muted); margin-bottom: 16px; line-height: 1.8; }
+  p strong { color: var(--text); }
+
+  /* ── Cards ───────────────────────────────────────── */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 10px;
+  }
+  .card-icon { font-size: 22px; }
+  .card p { margin: 0; font-size: 13px; }
+
+  /* ── Grid ────────────────────────────────────────── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* ── Agent cards ─────────────────────────────────── */
+  .agent-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .agent-card:hover { border-color: var(--primary); }
+  .agent-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .agent-role {
+    font-size: 11px;
+    color: var(--primary-light);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .agent-desc { font-size: 12px; color: var(--text-muted); margin: 0; }
+
+  /* ── Feature list ────────────────────────────────── */
+  .feature-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .feature-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .feature-list li::before {
+    content: '✓';
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .feature-list li strong { color: var(--text); }
+
+  /* ── Use case ────────────────────────────────────── */
+  .usecase {
+    background: linear-gradient(135deg, rgba(108,99,255,0.08) 0%, rgba(0,212,170,0.05) 100%);
+    border: 1px solid rgba(108,99,255,0.2);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+    page-break-inside: avoid;
+  }
+  .usecase-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .usecase-number {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: white;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .usecase h3 { margin: 0; font-size: 17px; }
+  .usecase-context {
+    font-size: 12px;
+    color: var(--primary-light);
+    font-weight: 500;
+    margin-bottom: 12px;
+    margin-top: 0;
+  }
+  .step-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .step-list li {
+    display: flex;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+    align-items: flex-start;
+  }
+  .step-num {
+    background: rgba(108,99,255,0.2);
+    color: var(--primary-light);
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── Tech stack ──────────────────────────────────── */
+  .tech-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    margin: 4px;
+  }
+  .tech-group { margin-bottom: 20px; }
+  .tech-group-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  /* ── Architecture diagram ──────────────────────────── */
+  .arch-box {
+    background: var(--dark3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .arch-box.highlight {
+    border-color: rgba(108,99,255,0.5);
+    background: rgba(108,99,255,0.1);
+    color: var(--primary-light);
+  }
+  .arch-box.accent {
+    border-color: rgba(0,212,170,0.4);
+    background: rgba(0,212,170,0.08);
+    color: var(--accent);
+  }
+  .arch-arrow {
+    text-align: center;
+    font-size: 20px;
+    color: var(--text-muted);
+    margin: 4px 0;
+  }
+
+  /* ── Keyboard shortcuts ─────────────────────────── */
+  kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--dark3);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-bottom: 2px solid rgba(255,255,255,0.1);
+    border-radius: 5px;
+    padding: 2px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .shortcut-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .shortcut-row:last-child { border-bottom: none; }
+  .shortcut-row .keys { display: flex; gap: 4px; min-width: 140px; }
+
+  /* ── Stats ───────────────────────────────────────── */
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 34px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--primary-light), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-label { font-size: 12px; color: var(--text-muted); }
+
+  /* ── Callout ─────────────────────────────────────── */
+  .callout {
+    display: flex;
+    gap: 14px;
+    background: rgba(0,212,170,0.07);
+    border: 1px solid rgba(0,212,170,0.25);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 13px;
+    color: var(--text-muted);
+    align-items: flex-start;
+  }
+  .callout-icon { font-size: 20px; flex-shrink: 0; }
+
+  /* ── Code block ──────────────────────────────────── */
+  .code-block {
+    background: var(--dark2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #a8b8d8;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+  .code-block .comment { color: #5a6e8a; }
+  .code-block .keyword { color: var(--primary-light); }
+  .code-block .string { color: var(--accent); }
+
+  /* ── Page break ──────────────────────────────────── */
+  .page-break { page-break-before: always; }
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    /* Force dark opaque backgrounds so white text stays readable */
+    body {
+      background: #0F0F1A !important;
+      color: #E8E8F0 !important;
+    }
+    .content { background: #0F0F1A !important; }
+    .card, .agent-card, .usecase, .toc, .code-block, .callout,
+    .stat-card, .shortcut-row, .tech-badge, .wf-step, .arch-box {
+      background: #1E1E35 !important;
+      border-color: rgba(255,255,255,0.15) !important;
+    }
+    .arch-box.highlight { background: rgba(108,99,255,0.25) !important; }
+    .arch-box.accent    { background: rgba(0,212,170,0.18) !important; }
+    .callout            { background: rgba(0,212,170,0.12) !important; }
+    .usecase            { background: rgba(108,99,255,0.12) !important; }
+
+    /* Force all text to be readable */
+    p, li, .agent-desc, .card p, .toc-item, .shortcut-row,
+    .wf-step .wf-sub, small { color: #B8B8D0 !important; }
+    h3, .card-title, .agent-name, .section h2, .cover h1,
+    .agent-role, .toc-num, .section-number,
+    .cover-badge, .stat-label, .tech-group-label { color: #E8E8F0 !important; }
+    .cover h1 {
+      background: linear-gradient(135deg, #FFFFFF 0%, #C4BFFF 50%, #00D4AA 100%) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+    }
+    .stat-value {
+      background: linear-gradient(135deg, #8B85FF, #00D4AA) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+    }
+
+    /* Gradient text fallback for elements that may not support it */
+    .section-number { color: white !important; background: #6C63FF !important; }
+    kbd { background: #2a2a45 !important; color: #E8E8F0 !important; border-color: rgba(255,255,255,0.2) !important; }
+  }
+
+  /* ── Footer ──────────────────────────────────────── */
+  .footer {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted);
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 80px;
+  }
+  .footer a { color: var(--primary-light); text-decoration: none; }
+
+  /* ── TOC ─────────────────────────────────────────── */
+  .toc {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 32px;
+    margin-bottom: 48px;
+  }
+  .toc h3 { margin: 0 0 16px; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 2px; }
+  .toc-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+  .toc-item:last-child { border-bottom: none; }
+  .toc-title { display: flex; align-items: center; gap: 10px; }
+  .toc-num { color: var(--primary-light); font-weight: 600; font-size: 13px; }
+
+  /* ── Workflow diagram ────────────────────────────── */
+  .workflow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 20px 0;
+  }
+  .wf-step {
+    flex-shrink: 0;
+    background: var(--dark3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    text-align: center;
+    min-width: 120px;
+  }
+  .wf-step .wf-icon { font-size: 24px; margin-bottom: 6px; }
+  .wf-step .wf-label { font-size: 11px; color: var(--text); font-weight: 600; }
+  .wf-step .wf-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+  .wf-arrow { padding: 0 8px; color: var(--text-muted); font-size: 18px; flex-shrink: 0; }
+  .wf-step.active { border-color: rgba(108,99,255,0.5); background: rgba(108,99,255,0.1); }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     COVER
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-logo">🤖</div>
+  <div class="cover-badge">Documentation Officielle</div>
+  <h1>BMAD Agent GUI</h1>
+  <p class="subtitle">Interface desktop intelligente pour orchestrer des agents IA spécialisés selon la méthode BMAD</p>
+  <div class="cover-meta">
+    <span><strong>Version</strong> 1.0.0</span>
+    <span><strong>Plateforme</strong> Windows / macOS / Linux</span>
+    <span><strong>Stack</strong> Electron · React · Node.js</span>
+    <span><strong>Agents</strong> 10 spécialistes IA</span>
+    <span><strong>Tests</strong> 263 passants</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     CONTENT
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="content">
+
+  <!-- Table des matières -->
+  <div class="toc">
+    <h3>Sommaire</h3>
+    <div class="toc-item"><div class="toc-title"><span class="toc-num">01</span> Vue d'ensemble</div></div>
+    <div class="toc-item"><div class="toc-title"><span class="toc-num">02</span> Architecture technique</div></div>
+    <div class="toc-item"><div class="toc-title"><span class="toc-title">03</span> Les 10 agents BMAD</div></div>
+    <div class="toc-item"><div class="toc-title"><span class="toc-num">04</span> Fonctionnalités principales</div></div>
+    <div class="toc-item"><div class="toc-title"><span class="toc-num">05</span> Interface utilisateur</div></div>
+    <div class="toc-item"><div class="toc-title"><span class="toc-num">06</span> Cas d'usage détaillés</div></div>
+    <div class="toc-item"><div class="toc-title"><span class="toc-num">07</span> Gestion documentaire</div></div>
+    <div class="toc-item"><div class="toc-title"><span class="toc-num">08</span> Raccourcis & productivité</div></div>
+    <div class="toc-item"><div class="toc-title"><span class="toc-num">09</span> Configuration & déploiement</div></div>
+    <div class="toc-item"><div class="toc-title"><span class="toc-num">10</span> Qualité & tests</div></div>
+  </div>
+
+  <!-- ── 01. Vue d'ensemble ─────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">
+      <div class="section-number">01</div>
+      <h2>Vue d'ensemble</h2>
+    </div>
+    <div class="section-divider"></div>
+
+    <p>
+      <strong>BMAD Agent GUI</strong> est une application desktop cross-platform construite avec Electron et React. Elle offre une interface graphique complète pour interagir avec les dix agents spécialisés de la méthode <strong>BMAD (Breakthrough Method for Agile Development)</strong>, directement depuis votre ordinateur, sans passer par un navigateur.
+    </p>
+    <p>
+      L'application permet de passer des instructions textuelles à des agents IA — chacun expert dans un domaine précis du développement logiciel — et d'obtenir des réponses riches, structurées et sauvegardées automatiquement sous forme de documents.
+    </p>
+
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-value">10</div><div class="stat-label">Agents spécialisés</div></div>
+      <div class="stat-card"><div class="stat-value">4</div><div class="stat-label">Fournisseurs LLM</div></div>
+      <div class="stat-card"><div class="stat-value">263</div><div class="stat-label">Tests automatisés</div></div>
+      <div class="stat-card"><div class="stat-value">∞</div><div class="stat-label">Projets simultanés</div></div>
+    </div>
+
+    <div class="callout">
+      <span class="callout-icon">💡</span>
+      <span>La méthode <strong>BMAD</strong> est une approche structurée du développement logiciel assisté par IA. Chaque agent correspond à un rôle dans une équipe projet réelle : analyste, architecte, développeur, PM, QA… BMAD Agent GUI rend cette équipe virtuelle opérationnelle en quelques secondes.</span>
+    </div>
+
+    <h3>Problème résolu</h3>
+    <p>
+      Les outils LLM génériques (ChatGPT, Claude, etc.) manquent de contexte métier, de mémoire de projet persistante, et de rôles définis. Basculer entre différents chats pour différentes tâches fait perdre le fil du projet. <strong>BMAD Agent GUI</strong> centralise tout : contexte partagé, agents spécialisés, historique documentaire structuré, et coordination inter-agents.
+    </p>
+  </div>
+
+  <!-- ── 02. Architecture technique ────────────────────────────── -->
+  <div class="section page-break">
+    <div class="section-label">
+      <div class="section-number">02</div>
+      <h2>Architecture technique</h2>
+    </div>
+    <div class="section-divider"></div>
+
+    <div class="grid-2" style="margin-bottom:20px">
+      <div>
+        <div class="arch-box highlight" style="margin-bottom:10px">⚛️ React 18 — UI / Routing / State</div>
+        <div class="arch-arrow">⬇</div>
+        <div class="arch-box highlight" style="margin-top:10px">🔌 Preload Bridge (contextBridge)</div>
+      </div>
+      <div>
+        <div class="arch-box accent" style="margin-bottom:10px">⚡ Electron Main Process</div>
+        <div class="arch-arrow">⬇</div>
+        <div class="arch-box accent" style="margin-top:10px">🧠 BMAD Backend (Node.js)</div>
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top:16px">
+      <div class="arch-box">
+        <div style="font-size:20px;margin-bottom:6px">🤖</div>
+        <div>AI Service<br><small style="color:var(--text-muted)">Ollama · Claude · Gemini · OpenAI</small></div>
+      </div>
+      <div class="arch-box">
+        <div style="font-size:20px;margin-bottom:6px">📁</div>
+        <div>Workspace Manager<br><small style="color:var(--text-muted)">Lecture/écriture projet réel</small></div>
+      </div>
+      <div class="arch-box">
+        <div style="font-size:20px;margin-bottom:6px">📚</div>
+        <div>Doc Manager<br><small style="color:var(--text-muted)">Historique agents</small></div>
+      </div>
+      <div class="arch-box">
+        <div style="font-size:20px;margin-bottom:6px">🧩</div>
+        <div>Agent Coordinator<br><small style="color:var(--text-muted)">Pipelines · Party mode</small></div>
+      </div>
+      <div class="arch-box">
+        <div style="font-size:20px;margin-bottom:6px">🗃️</div>
+        <div>Project Context<br><small style="color:var(--text-muted)">Mémoire partagée</small></div>
+      </div>
+      <div class="arch-box">
+        <div style="font-size:20px;margin-bottom:6px">💾</div>
+        <div>State Persistence<br><small style="color:var(--text-muted)">gui-state.json</small></div>
+      </div>
+    </div>
+
+    <h3>Stack technologique</h3>
+    <div class="tech-group">
+      <div class="tech-group-label">Frontend</div>
+      <span class="tech-badge">⚛️ React 18.3</span>
+      <span class="tech-badge">🛣️ React Router v6</span>
+      <span class="tech-badge">📊 Recharts</span>
+      <span class="tech-badge">🎨 CSS Variables + Animations</span>
+    </div>
+    <div class="tech-group">
+      <div class="tech-group-label">Desktop</div>
+      <span class="tech-badge">⚡ Electron 33.2</span>
+      <span class="tech-badge">🔒 Context Isolation</span>
+      <span class="tech-badge">📢 Notifications OS</span>
+      <span class="tech-badge">📦 electron-builder</span>
+    </div>
+    <div class="tech-group">
+      <div class="tech-group-label">Backend / IA</div>
+      <span class="tech-badge">🦙 Ollama (local)</span>
+      <span class="tech-badge">🧠 Anthropic Claude</span>
+      <span class="tech-badge">🌟 Google Gemini</span>
+      <span class="tech-badge">🤖 OpenAI</span>
+    </div>
+    <div class="tech-group">
+      <div class="tech-group-label">Données</div>
+      <span class="tech-badge">📄 YAML (config)</span>
+      <span class="tech-badge">📝 Markdown (docs)</span>
+      <span class="tech-badge">🗂️ JSON (état)</span>
+      <span class="tech-badge">📦 ZIP (export)</span>
+    </div>
+    <div class="tech-group">
+      <div class="tech-group-label">Qualité</div>
+      <span class="tech-badge">🧪 Jest</span>
+      <span class="tech-badge">✅ 263 tests</span>
+      <span class="tech-badge">6 suites</span>
+    </div>
+  </div>
+
+  <!-- ── 03. Les 10 agents BMAD ─────────────────────────────────── -->
+  <div class="section page-break">
+    <div class="section-label">
+      <div class="section-number">03</div>
+      <h2>Les 10 agents BMAD</h2>
+    </div>
+    <div class="section-divider"></div>
+
+    <p>Chaque agent est un LLM configuré avec un system prompt spécialisé, des instructions de rôle précises, et un accès au contexte partagé du projet. Ils peuvent travailler seuls ou être coordonnés en pipeline.</p>
+
+    <div class="grid-2">
+      <div class="agent-card">
+        <div class="agent-name">📊 Analyste</div>
+        <div class="agent-role">Business Analysis</div>
+        <p class="agent-desc">Recueille et structure les besoins, rédige les user stories, identifie les risques et parties prenantes. Produit des documents de cadrage complets.</p>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">🏗️ Architecte</div>
+        <div class="agent-role">Software Architecture</div>
+        <p class="agent-desc">Conçoit l'architecture système, choisit les patterns, définit les interfaces et les décisions techniques structurantes.</p>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">📋 Product Manager</div>
+        <div class="agent-role">Product Management</div>
+        <p class="agent-desc">Définit la vision produit, priorise le backlog, rédige les PRD et aligne les équipes sur les objectifs business.</p>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">📦 Product Owner</div>
+        <div class="agent-role">Product Ownership</div>
+        <p class="agent-desc">Gère le backlog sprint par sprint, affine les stories, valide les critères d'acceptation et les DoD.</p>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">🎨 UX Expert</div>
+        <div class="agent-role">User Experience</div>
+        <p class="agent-desc">Conçoit les parcours utilisateurs, wireframes, spécifications d'interface et recommandations d'accessibilité.</p>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">💻 Développeur</div>
+        <div class="agent-role">Software Development</div>
+        <p class="agent-desc">Implémente les fonctionnalités, revoit le code, propose des refactorings et explique les choix techniques.</p>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">🐛 QA Engineer</div>
+        <div class="agent-role">Quality Assurance</div>
+        <p class="agent-desc">Rédige les plans de test, identifie les cas limites, analyse les bugs et propose des stratégies de test.</p>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">🏃 Scrum Master</div>
+        <div class="agent-role">Agile Coaching</div>
+        <p class="agent-desc">Facilite les cérémonies Scrum, lève les blocages, mesure la vélocité et accompagne l'amélioration continue.</p>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">🧙 BMAD Master</div>
+        <div class="agent-role">Master Coordinator</div>
+        <p class="agent-desc">Supervise l'ensemble du projet, coordonne les agents et prend les décisions transverses de haut niveau.</p>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">🎭 Orchestrateur</div>
+        <div class="agent-role">Pipeline Orchestration</div>
+        <p class="agent-desc">Organise et exécute des pipelines multi-agents, délègue les tâches et consolide les résultats en un livrable cohérent.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 04. Fonctionnalités ────────────────────────────────────── -->
+  <div class="section page-break">
+    <div class="section-label">
+      <div class="section-number">04</div>
+      <h2>Fonctionnalités principales</h2>
+    </div>
+    <div class="section-divider"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span class="card-icon">💬</span> Chat multi-agents</div>
+        <p>Conversation directe avec n'importe quel agent. Historique de session, streaming des réponses en temps réel, contexte projet injecté automatiquement.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-icon">🎉</span> Party Mode (collaboration)</div>
+        <p>Réunissez plusieurs agents en simultané. Chacun réagit à la discussion, vous pouvez interpeller un agent spécifique ou laisser l'Orchestrateur coordonner.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-icon">⚡</span> Pipelines automatisés</div>
+        <p>Définissez des séquences d'agents à exécuter avec des prompts préconfigurés. Suivi visuel étape par étape avec le PipelineVisualizer animé.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-icon">📁</span> Workspace réel</div>
+        <p>Pointez l'application sur votre dossier projet. Les agents lisent vos fichiers source (code, docs, configs) pour fournir des réponses contextualisées.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-icon">📚</span> Historique documentaire</div>
+        <p>Chaque réponse agent peut être sauvegardée en Markdown. Navigateur 3 colonnes pour parcourir projets, dossiers par agent, et documents.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-icon">📦</span> Export ZIP</div>
+        <p>Exportez tout le projet documentaire en archive ZIP en un clic. Idéal pour partager avec l'équipe ou archiver une version.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-icon">🔍</span> Command Palette</div>
+        <p>Accès rapide à toute la navigation via Ctrl+K. Recherche fuzzy sur 12 commandes, navigation clavier complète.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-icon">🔔</span> Notifications OS</div>
+        <p>Quand un pipeline se termine, l'OS envoie une notification native — vous pouvez travailler sur autre chose en attendant.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-icon">🧠</span> Mémoire partagée</div>
+        <p>Le contexte projet (objectif, stack, décisions) est partagé entre tous les agents. Cohérence garantie sur toute la session.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-icon">🌐</span> Multi-fournisseur LLM</div>
+        <p>Ollama (local/gratuit), Claude d'Anthropic, Gemini de Google, et OpenAI — configurables par agent ou globalement.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 05. Interface utilisateur ─────────────────────────────── -->
+  <div class="section page-break">
+    <div class="section-label">
+      <div class="section-number">05</div>
+      <h2>Interface utilisateur</h2>
+    </div>
+    <div class="section-divider"></div>
+
+    <h3>Structure de navigation</h3>
+    <p>L'interface est divisée en une <strong>sidebar fixe</strong> à gauche et un <strong>espace de travail</strong> à droite. La sidebar donne accès à toutes les sections principales :</p>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">🏠 Tableau de bord</div>
+      <p>Vue synthétique de l'état du projet : agents actifs, dernières conversations, métriques d'utilisation (tokens, coûts estimés), raccourcis rapides vers les actions fréquentes.</p>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">🤖 Agents</div>
+      <p>Liste des 10 agents avec leur statut, leur modèle LLM configuré, et les statistiques de session. Lancement direct d'une conversation depuis cette vue.</p>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">💬 Conversations</div>
+      <p>Historique complet de toutes les sessions par agent. Reprise d'une conversation existante, recherche par contenu, suppression de sessions.</p>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">🎉 Party Chat</div>
+      <p>Mode collaboration multi-agents. Interface de chat avec sélection des agents participants, PipelineVisualizer pour les exécutions séquentielles, et mode Party libre.</p>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">📁 Workspace</div>
+      <p>Explorateur de fichiers du projet réel. Navigation dans l'arborescence, lecture de fichiers, injection dans le prompt courant d'un agent.</p>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">📚 Historique documentaire</div>
+      <p>Navigateur 3 colonnes. Panneaux : projets doc (gauche), dossiers par agent (centre), liste des documents (droite). Ouverture directe dans le MarkdownViewer.</p>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">⚙️ Paramètres</div>
+      <p>Configuration des clés API, sélection des modèles LLM par agent, paramètres de température, URL Ollama, préférences d'interface.</p>
+    </div>
+
+    <h3>Composants UI notables</h3>
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-title">⌨️ CommandPalette</div>
+        <p>Overlay Ctrl+K, fuzzy search, navigation flèches/Enter/Escape. S'ouvre depuis n'importe quelle page.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 PipelineVisualizer</div>
+        <p>Tracker animé d'étapes de pipeline. Mode compact (dots) ou complet (timeline). Spinner pour l'état running.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📝 MarkdownViewer</div>
+        <p>Panneau slide-in depuis la droite. Mode lecture (rendu HTML) + mode édition (textarea). Sauvegarde Ctrl+S.</p>
+      </div>
+    </div>
+
+    <h3>Design system</h3>
+    <ul class="feature-list">
+      <li><strong>Thème sombre</strong> — fond #0F0F1A, accents violet (#6C63FF) et vert-cyan (#00D4AA)</li>
+      <li><strong>Animations fluides</strong> — pageSlideIn à chaque navigation, cmdFadeIn pour la palette, mdSlideIn pour le viewer</li>
+      <li><strong>Variables CSS</strong> — toutes les couleurs, espacements et rayons centralisés en CSS custom properties</li>
+      <li><strong>Responsive</strong> — layout adaptatif avec grilles CSS, scroll géré par zone</li>
+      <li><strong>Feedback utilisateur</strong> — press animation sur tous les boutons, focus rings accessibles, états de chargement animés</li>
+    </ul>
+  </div>
+
+  <!-- ── 06. Cas d'usage ────────────────────────────────────────── -->
+  <div class="section page-break">
+    <div class="section-label">
+      <div class="section-number">06</div>
+      <h2>Cas d'usage détaillés</h2>
+    </div>
+    <div class="section-divider"></div>
+
+    <div class="usecase">
+      <div class="usecase-header">
+        <div class="usecase-number">1</div>
+        <h3>Démarrer un nouveau projet logiciel</h3>
+      </div>
+      <p class="usecase-context">Contexte : Une équipe reçoit un brief client. Ils veulent structurer le projet en 2 heures au lieu de 2 jours.</p>
+      <ul class="step-list">
+        <li><span class="step-num">1</span>Ouvrir BMAD GUI, créer un nouveau workspace, pointer sur le dossier projet</li>
+        <li><span class="step-num">2</span>Aller dans <strong>Party Chat</strong>, sélectionner Analyste + PM + Architecte</li>
+        <li><span class="step-num">3</span>Décrire le brief en langage naturel : "Construire une appli de réservation de salles pour 500 utilisateurs…"</li>
+        <li><span class="step-num">4</span>L'Analyste extrait les besoins → le PM rédige la vision → l'Architecte propose une stack</li>
+        <li><span class="step-num">5</span>Chaque document généré est sauvegardé automatiquement dans l'historique documentaire</li>
+        <li><span class="step-num">6</span>Exporter le dossier ZIP pour partager avec les parties prenantes</li>
+      </ul>
+    </div>
+
+    <div class="usecase">
+      <div class="usecase-header">
+        <div class="usecase-number">2</div>
+        <h3>Pipeline de spécification automatisé</h3>
+      </div>
+      <p class="usecase-context">Contexte : Un développeur solo veut produire des specs complètes pour une feature en une commande.</p>
+      <ul class="step-list">
+        <li><span class="step-num">1</span>Dans Party Chat, créer un pipeline : Analyste → PM → PO → UX Expert</li>
+        <li><span class="step-num">2</span>Entrer le titre de la feature : "Système de notifications push multi-canal"</li>
+        <li><span class="step-num">3</span>Lancer le pipeline — le PipelineVisualizer affiche la progression en temps réel</li>
+        <li><span class="step-num">4</span>Chaque agent s'appuie sur la sortie du précédent (contexte partagé automatiquement)</li>
+        <li><span class="step-num">5</span>Une notification OS s'affiche quand tout est terminé</li>
+        <li><span class="step-num">6</span>4 documents structurés prêts en ~5 minutes</li>
+      </ul>
+    </div>
+
+    <div class="usecase">
+      <div class="usecase-header">
+        <div class="usecase-number">3</div>
+        <h3>Revue de code intelligente</h3>
+      </div>
+      <p class="usecase-context">Contexte : Un développeur veut obtenir une revue de code approfondie enrichie du contexte architectural.</p>
+      <ul class="step-list">
+        <li><span class="step-num">1</span>Pointer le workspace sur le dossier du projet (src/, tests/)</li>
+        <li><span class="step-num">2</span>Ouvrir l'agent <strong>Développeur</strong> en conversation directe</li>
+        <li><span class="step-num">3</span>Dans l'onglet Workspace, sélectionner les fichiers à revoir et les injecter dans le prompt</li>
+        <li><span class="step-num">4</span>L'agent lit le code avec le contexte architectural de l'Architecte déjà en mémoire</li>
+        <li><span class="step-num">5</span>Suivre avec l'agent <strong>QA</strong> pour des suggestions de tests</li>
+        <li><span class="step-num">6</span>Sauvegarder le rapport de revue en Markdown dans l'historique</li>
+      </ul>
+    </div>
+
+    <div class="usecase">
+      <div class="usecase-header">
+        <div class="usecase-number">4</div>
+        <h3>Planification d'un sprint</h3>
+      </div>
+      <p class="usecase-context">Contexte : L'équipe prépare le sprint planning pour la semaine suivante.</p>
+      <ul class="step-list">
+        <li><span class="step-num">1</span>Ouvrir le <strong>Scrum Master</strong> avec le backlog en contexte (fichier JIRA export ou Markdown)</li>
+        <li><span class="step-num">2</span>Demander : "Propose un sprint de 10 points basé sur nos capacités actuelles"</li>
+        <li><span class="step-num">3</span>Passer au <strong>Product Owner</strong> pour affiner les critères d'acceptation des stories sélectionnées</li>
+        <li><span class="step-num">4</span>Utiliser le <strong>Développeur</strong> pour estimer la complexité technique de chaque story</li>
+        <li><span class="step-num">5</span>Document de sprint plan sauvegardé et exportable</li>
+      </ul>
+    </div>
+
+    <div class="usecase">
+      <div class="usecase-header">
+        <div class="usecase-number">5</div>
+        <h3>Documentation continue d'un projet existant</h3>
+      </div>
+      <p class="usecase-context">Contexte : Un projet legacy sans documentation. Besoin de produire rapidement une doc technique.</p>
+      <ul class="step-list">
+        <li><span class="step-num">1</span>Créer un nouveau projet documentaire dans BMAD GUI</li>
+        <li><span class="step-num">2</span>Pointer le workspace sur le projet legacy</li>
+        <li><span class="step-num">3</span>L'<strong>Architecte</strong> analyse le code source et génère un document d'architecture existante</li>
+        <li><span class="step-num">4</span>Le <strong>Développeur</strong> documente les modules critiques en parcourant les fichiers injectés</li>
+        <li><span class="step-num">5</span>Le <strong>QA</strong> identifie les zones sans couverture de test</li>
+        <li><span class="step-num">6</span>Naviguer dans l'<strong>Historique documentaire</strong>, éditer chaque doc via MarkdownViewer, exporter ZIP</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── 07. Gestion documentaire ──────────────────────────────── -->
+  <div class="section page-break">
+    <div class="section-label">
+      <div class="section-number">07</div>
+      <h2>Gestion documentaire</h2>
+    </div>
+    <div class="section-divider"></div>
+
+    <p>BMAD Agent GUI intègre un système de <strong>documentation automatique</strong> : chaque réponse significative d'un agent peut être persistée sous forme de fichier Markdown, organisée par projet et par agent.</p>
+
+    <h3>Structure des projets documentaires</h3>
+    <div class="code-block">
+<span class="comment"># ~/.bmad/doc-projects/</span>
+<span class="keyword">mon-projet/</span>
+├── <span class="string">meta.json</span>             <span class="comment"># Métadonnées, compteur de docs</span>
+├── <span class="keyword">01-analyse/</span>
+│   ├── 20260304-093012-analyse-besoins.md
+│   └── 20260304-141500-user-stories.md
+├── <span class="keyword">02-architecture/</span>
+│   └── 20260304-100200-architecture-systeme.md
+├── <span class="keyword">06-developpement/</span>
+│   └── 20260304-154200-revue-code-auth.md
+└── <span class="keyword">_historique/</span>
+    └── 20260304-160000-session-recap.md
+    </div>
+
+    <h3>Fonctionnalités du gestionnaire documentaire</h3>
+    <ul class="feature-list">
+      <li><strong>Création de projets multiples</strong> — Séparez vos projets clients, produits internes, ou expérimentations</li>
+      <li><strong>Sélection active</strong> — Le projet actif est persisté au redémarrage de l'application, restauré automatiquement</li>
+      <li><strong>Arborescence par agent</strong> — Les documents sont classés dans un dossier par agent générant la sortie</li>
+      <li><strong>Horodatage automatique</strong> — Chaque fichier porte un timestamp YYYYMMDD-HHMMSS pour l'ordre chronologique</li>
+      <li><strong>Édition inline</strong> — Le MarkdownViewer permet de modifier un doc sans quitter l'application</li>
+      <li><strong>Export ZIP</strong> — Archive l'intégralité d'un projet documentaire, prête à partager ou stocker</li>
+      <li><strong>Protection anti-traversal</strong> — Les chemins de fichiers sont validés pour éviter toute écriture hors du projet</li>
+    </ul>
+
+    <h3>MarkdownViewer</h3>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">👁️ Mode lecture</div>
+        <p>Rendu HTML complet du Markdown : titres, listes, code blocks, tableaux, emphases. Police monospace pour les blocs de code.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">✏️ Mode édition</div>
+        <p>Textarea plein écran pour modifier le contenu. Sauvegarde avec Ctrl+S. Bascule lecture/édition sans fermer le panneau.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 08. Raccourcis & productivité ─────────────────────────── -->
+  <div class="section page-break">
+    <div class="section-label">
+      <div class="section-number">08</div>
+      <h2>Raccourcis & productivité</h2>
+    </div>
+    <div class="section-divider"></div>
+
+    <h3>Raccourcis globaux</h3>
+    <div class="card">
+      <div class="shortcut-row"><div class="keys"><kbd>Ctrl</kbd><kbd>K</kbd></div><div>Ouvrir la Command Palette — navigation rapide, recherche fuzzy</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>Ctrl</kbd><kbd>1</kbd></div><div>Aller au Tableau de bord</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>Ctrl</kbd><kbd>2</kbd></div><div>Aller aux Agents</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>Ctrl</kbd><kbd>3</kbd></div><div>Aller aux Conversations</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>Ctrl</kbd><kbd>4</kbd></div><div>Aller au Party Chat</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>Ctrl</kbd><kbd>5</kbd></div><div>Aller aux Paramètres</div></div>
+    </div>
+
+    <h3>Raccourcis contextuels</h3>
+    <div class="card">
+      <div class="shortcut-row"><div class="keys"><kbd>Ctrl</kbd><kbd>S</kbd></div><div>Sauvegarder (MarkdownViewer en mode édition)</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>Escape</kbd></div><div>Fermer la Command Palette / fermer le MarkdownViewer</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>↑</kbd><kbd>↓</kbd></div><div>Naviguer dans la Command Palette</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>Enter</kbd></div><div>Valider la sélection dans la Command Palette</div></div>
+    </div>
+
+    <h3>Command Palette — commandes disponibles</h3>
+    <div class="grid-2">
+      <ul class="feature-list">
+        <li>🏠 <strong>Tableau de bord</strong></li>
+        <li>🤖 <strong>Agents</strong></li>
+        <li>💬 <strong>Conversations</strong></li>
+        <li>🎉 <strong>Party Chat</strong></li>
+        <li>📁 <strong>Workspace</strong></li>
+        <li>📚 <strong>Historique documentaire</strong></li>
+      </ul>
+      <ul class="feature-list">
+        <li>⚙️ <strong>Paramètres</strong></li>
+        <li>🧙 <strong>BMAD Master</strong> (accès direct)</li>
+        <li>🎭 <strong>Orchestrateur</strong> (accès direct)</li>
+        <li>💻 <strong>Développeur</strong> (accès direct)</li>
+        <li>🏗️ <strong>Architecte</strong> (accès direct)</li>
+        <li>📊 <strong>Analyste</strong> (accès direct)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── 09. Configuration & déploiement ──────────────────────── -->
+  <div class="section page-break">
+    <div class="section-label">
+      <div class="section-number">09</div>
+      <h2>Configuration & déploiement</h2>
+    </div>
+    <div class="section-divider"></div>
+
+    <h3>Prérequis</h3>
+    <ul class="feature-list">
+      <li><strong>Node.js 18+</strong> — runtime JavaScript côté Electron/backend</li>
+      <li><strong>Git</strong> — pour cloner le projet</li>
+      <li>Au moins un <strong>fournisseur LLM</strong> configuré (clé API ou Ollama local)</li>
+    </ul>
+
+    <h3>Installation rapide</h3>
+    <div class="code-block">
+<span class="comment"># Cloner et installer</span>
+git clone https://github.com/paulmayer1905/bmad-agent-gui
+<span class="keyword">cd</span> bmad-agent-gui
+npm install
+
+<span class="comment"># Lancer en mode développement</span>
+npm run electron:dev
+
+<span class="comment"># Build production (Windows .exe)</span>
+npm run electron:build
+    </div>
+
+    <h3>Configuration LLM</h3>
+    <p>Les paramètres LLM sont stockés dans <code style="background:var(--dark3);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px">~/.bmad/ai-config.json</code>. Ils sont modifiables depuis l'interface Paramètres :</p>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">🦙 Ollama (local, gratuit)</div>
+        <p>Configurer l'URL Ollama (défaut : http://localhost:11434) et le modèle (llama3.1, mixtral, etc.). Aucune clé API requise.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🧠 Anthropic Claude</div>
+        <p>Entrer la clé API Anthropic. Modèles : claude-opus-4, claude-sonnet-4, claude-haiku-3. Streaming natif.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🌟 Google Gemini</div>
+        <p>Clé API Google AI Studio. Modèles : gemini-2.0-flash, gemini-1.5-pro. Support streaming.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🤖 OpenAI</div>
+        <p>Clé API OpenAI. Compatible GPT-4o, GPT-4-turbo, o1-mini. URL configurable (compatible Azure OpenAI).</p>
+      </div>
+    </div>
+
+    <h3>Persistance des données</h3>
+    <p>Toutes les données utilisateur sont stockées localement dans <code style="background:var(--dark3);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px">~/.bmad/</code> :</p>
+    <div class="code-block">
+~/.bmad/
+├── <span class="string">ai-config.json</span>       <span class="comment"># Clés API, modèles, paramètres</span>
+├── <span class="string">gui-state.json</span>       <span class="comment"># Dernier projet actif, préférences</span>
+├── <span class="string">project-context.json</span> <span class="comment"># Mémoire partagée des agents</span>
+├── <span class="keyword">sessions/</span>            <span class="comment"># Historique des conversations</span>
+├── <span class="keyword">doc-projects/</span>        <span class="comment"># Documents générés</span>
+└── <span class="keyword">workspaces/</span>          <span class="comment"># Configurations des workspaces</span>
+    </div>
+  </div>
+
+  <!-- ── 10. Qualité & tests ────────────────────────────────────── -->
+  <div class="section page-break">
+    <div class="section-label">
+      <div class="section-number">10</div>
+      <h2>Qualité & tests</h2>
+    </div>
+    <div class="section-divider"></div>
+
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-value">263</div><div class="stat-label">Tests passants</div></div>
+      <div class="stat-card"><div class="stat-value">6</div><div class="stat-label">Suites de tests</div></div>
+      <div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Tests échoués</div></div>
+      <div class="stat-card"><div class="stat-value">100%</div><div class="stat-label">Modules couverts</div></div>
+    </div>
+
+    <h3>Suites de tests</h3>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">🤖 agent-coordinator.test.js</div>
+        <p>Tests de coordination multi-agents, pipelines, délégation et party mode. Vérifie l'ordre d'exécution et la transmission de contexte.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📚 documentation-manager.test.js</div>
+        <p>Tests CRUD projets doc, génération d'arbre, écriture sécurisée de fichiers, protection anti-traversal, export ZIP.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 pipeline-quality.test.js</div>
+        <p>Tests de qualité des pipelines : gestion d'erreurs, timeouts, reprise sur échec, métriques de performance.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">💬 system-prompts.test.js</div>
+        <p>Validation des system prompts de chaque agent : format, cohérence, injection de contexte, longueur maximale.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📁 workspace-extended.test.js</div>
+        <p>Tests étendus du gestionnaire de workspace : lecture fichiers, filtrage, injection dans prompts, limites de taille.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🔧 Unit tests</div>
+        <p>Tests unitaires des modules individuels : AIService, ProjectContext, WorkspaceManager, BMADBackend.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="callout-icon">🔒</span>
+      <span>Les tests incluent des <strong>vérifications de sécurité</strong> : protection contre les path traversal attacks dans le gestionnaire documentaire, validation des entrées, et isolation des modules pour prévenir les effets de bord.</span>
+    </div>
+
+    <h3>Lancer les tests</h3>
+    <div class="code-block">
+<span class="comment"># Tous les tests</span>
+<span class="keyword">node</span> node_modules/jest/bin/jest.js --no-cache --forceExit
+
+<span class="comment"># Suite spécifique</span>
+<span class="keyword">node</span> node_modules/jest/bin/jest.js documentation-manager --forceExit
+
+<span class="comment"># Mode watch (développement)</span>
+<span class="keyword">node</span> node_modules/jest/bin/jest.js --watch
+    </div>
+  </div>
+
+  <!-- ── Footer ─────────────────────────────────────────────────── -->
+  <div class="footer">
+    <div style="font-size:28px;margin-bottom:12px">🤖</div>
+    <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px">BMAD Agent GUI v1.0.0</div>
+    <div style="margin-bottom:8px">Application desktop — Electron · React · Node.js</div>
+    <div>
+      <a href="https://github.com/paulmayer1905/bmad-agent-gui">github.com/paulmayer1905/bmad-agent-gui</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/bmad-code-org/BMAD-METHOD">BMAD Method</a>
+    </div>
+    <div style="margin-top:16px;font-size:11px;opacity:0.5">Document généré le 4 mars 2026</div>
+  </div>
+
+</div><!-- .content -->
+</body>
+</html>
