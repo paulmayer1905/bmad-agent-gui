@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, Notification } = require('electron');
 const path = require('path');
 const url = require('url');
 
@@ -95,6 +95,15 @@ async function initBackend() {
     coreRoot: path.join(bmadRoot, 'bmad-core')
   });
   await backend.initialize();
+
+  // Auto-restore last active doc project
+  try {
+    const lastId = await backend.getAppState('lastActiveProjectId');
+    if (lastId) {
+      const project = await backend.getDocProject(lastId);
+      if (project) backend.setActiveDocProject(lastId);
+    }
+  } catch {}
 }
 
 // ─── IPC Handlers ───────────────────────────────────────────────────────────
@@ -258,6 +267,14 @@ function registerIpcHandlers() {
 
     try {
       const result = await backend.executePipeline(pipeline, options);
+      // OS notification when pipeline completes
+      if (Notification.isSupported()) {
+        const stepCount = result?.results?.length || pipeline?.steps?.length || 0;
+        new Notification({
+          title: '✅ Pipeline terminé',
+          body: `${pipeline?.name || 'Pipeline'} — ${stepCount} étape(s) complétée(s)`,
+        }).show();
+      }
       return result;
     } finally {
       coordinator.removeListener('pipeline:step:start', onStepStart);
@@ -304,7 +321,12 @@ function registerIpcHandlers() {
   safeHandle('doc:project:get', (_, id) => backend.getDocProject(id));
   safeHandle('doc:project:list', () => backend.listDocProjects());
   safeHandle('doc:project:delete', (_, id) => backend.deleteDocProject(id));
-  safeHandle('doc:project:setActive', (_, id) => backend.setActiveDocProject(id));
+  safeHandle('doc:project:setActive', async (_, id) => {
+    const result = backend.setActiveDocProject(id);
+    // Persist last active project
+    backend.setAppState('lastActiveProjectId', id).catch(() => {});
+    return result;
+  });
   safeHandle('doc:project:getActive', () => backend.getActiveDocProject());
   safeHandle('doc:project:tree', (_, id) => backend.getDocProjectTree(id));
   safeHandle('doc:file:read', (_, projectId, relativePath) => backend.readDocFile(projectId, relativePath));
@@ -317,6 +339,34 @@ function registerIpcHandlers() {
       return { success: true };
     }
     return { success: false };
+  });
+
+  // ZIP export
+  safeHandle('doc:project:export-zip', async (_, id) => {
+    const project = await backend.getDocProject(id);
+    if (!project) return { canceled: true };
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Exporter le projet documentation',
+      defaultPath: `${project.name || 'bmad-project'}.zip`,
+      filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
+    });
+    if (result.canceled) return { canceled: true };
+    return await backend.exportDocProjectZip(id, result.filePath);
+  });
+
+  // Write doc file (inline markdown editor)
+  safeHandle('doc:file:write', (_, projectId, relativePath, content) =>
+    backend.writeDocFile(projectId, relativePath, content));
+
+  // App state (persistent key-value store)
+  safeHandle('app:state:get', (_, key) => backend.getAppState(key));
+  safeHandle('app:state:set', (_, key, value) => backend.setAppState(key, value));
+
+  // OS Notifications
+  ipcMain.on('app:notify', (_, { title, body }) => {
+    if (Notification.isSupported()) {
+      new Notification({ title: title || 'BMAD', body: body || '' }).show();
+    }
   });
 
   // Streaming chat (uses IPC events instead of invoke)

@@ -396,10 +396,40 @@ const api = {
       if (isElectron) return window.bmadAPI.docProject.openFolder(id);
       return { success: false };
     },
+    exportZip: async (id) => {
+      if (isElectron) return window.bmadAPI.docProject.exportZip(id);
+      return { canceled: true };
+    },
+    writeFile: async (projectId, relativePath, content) => {
+      if (isElectron) return window.bmadAPI.docProject.writeFile(projectId, relativePath, content);
+      return { success: false };
+    },
     onAutoSaved: (callback) => {
       if (isElectron) return window.bmadAPI.docProject.onAutoSaved(callback);
       return () => {}; // noop cleanup
     },
+  },
+
+  // App state (persistent key-value)
+  appState: {
+    get: async (key) => {
+      if (isElectron) return window.bmadAPI.appState.get(key);
+      try { return key ? JSON.parse(localStorage.getItem(`bmad_${key}`)) : {}; } catch { return undefined; }
+    },
+    set: async (key, value) => {
+      if (isElectron) return window.bmadAPI.appState.set(key, value);
+      localStorage.setItem(`bmad_${key}`, JSON.stringify(value));
+      return { ok: true };
+    },
+  },
+
+  // OS Notifications
+  notify: (title, body) => {
+    if (isElectron && window.bmadAPI.notify) {
+      window.bmadAPI.notify(title, body);
+    } else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification(title, { body });
+    }
   },
 };
 

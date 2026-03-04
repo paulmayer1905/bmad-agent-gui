@@ -695,6 +695,39 @@ class BMADBackend {
     return await this._docManager.saveConversationHistory(agentName, agentName, messages, { sessionId });
   }
 
+  async exportDocProjectZip(id, destPath) {
+    return await this._docManager.exportProjectZip(id, destPath);
+  }
+
+  async writeDocFile(projectId, relativePath, content) {
+    return await this._docManager.writeDocument(projectId, relativePath, content);
+  }
+
+  // ─── App State (persistent last-project etc.) ─────────────────────────
+
+  async getAppState(key) {
+    const stateFile = path.join(this.basePath, 'gui-state.json');
+    try {
+      const raw = await fs.readFile(stateFile, 'utf8');
+      const state = JSON.parse(raw);
+      return key ? state[key] : state;
+    } catch {
+      return key ? undefined : {};
+    }
+  }
+
+  async setAppState(key, value) {
+    const stateFile = path.join(this.basePath, 'gui-state.json');
+    let state = {};
+    try {
+      const raw = await fs.readFile(stateFile, 'utf8');
+      state = JSON.parse(raw);
+    } catch {}
+    state[key] = value;
+    await fs.writeFile(stateFile, JSON.stringify(state, null, 2), 'utf8');
+    return { ok: true };
+  }
+
   getDocManager() {
     return this._docManager;
   }

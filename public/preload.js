@@ -169,11 +169,22 @@ contextBridge.exposeInMainWorld('bmadAPI', {
     readFile: (projectId, relativePath) => ipcRenderer.invoke('doc:file:read', projectId, relativePath),
     saveConversation: (sessionId) => ipcRenderer.invoke('doc:conversation:save', sessionId),
     openFolder: (id) => ipcRenderer.invoke('doc:project:open', id),
+    exportZip: (id) => ipcRenderer.invoke('doc:project:export-zip', id),
+    writeFile: (projectId, relativePath, content) => ipcRenderer.invoke('doc:file:write', projectId, relativePath, content),
     onAutoSaved: (callback) => {
       ipcRenderer.on('doc:autosaved', (_, data) => callback(data));
       return () => ipcRenderer.removeAllListeners('doc:autosaved');
     },
   },
+
+  // App State (persistent key-value)
+  appState: {
+    get: (key) => ipcRenderer.invoke('app:state:get', key),
+    set: (key, value) => ipcRenderer.invoke('app:state:set', key, value),
+  },
+
+  // OS Notifications
+  notify: (title, body) => ipcRenderer.send('app:notify', { title, body }),
 
   // Navigation events from menu
   onNavigate: (callback) => {

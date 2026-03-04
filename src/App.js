@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
+import CommandPalette from './components/CommandPalette';
 import Dashboard from './pages/Dashboard';
 import Agents from './pages/Agents';
 import AgentDetail from './pages/AgentDetail';
@@ -13,9 +14,11 @@ import ConfigEditor from './pages/ConfigEditor';
 import Checklists from './pages/Checklists';
 import Tasks from './pages/Tasks';
 import PartyChat from './pages/PartyChat';
+import DocHistory from './pages/DocHistory';
 
 function AppInner() {
   const navigate = useNavigate();
+  const [cmdOpen, setCmdOpen] = useState(false);
 
   useEffect(() => {
     // Listen for menu navigation events from Electron
@@ -27,10 +30,29 @@ function AppInner() {
     }
   }, [navigate]);
 
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e) => {
+      // Ctrl+K / ⌘K — command palette
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setCmdOpen(v => !v);
+      }
+      // Ctrl+1…9 — quick navigation (already handled by menu in Electron, but add fallback)
+      if ((e.ctrlKey || e.metaKey) && e.key === '1') { e.preventDefault(); navigate('/'); }
+      if ((e.ctrlKey || e.metaKey) && e.key === '2') { e.preventDefault(); navigate('/agents'); }
+      if ((e.ctrlKey || e.metaKey) && e.key === '3') { e.preventDefault(); navigate('/sessions'); }
+      if ((e.ctrlKey || e.metaKey) && e.key === '4') { e.preventDefault(); navigate('/collaboration'); }
+      if ((e.ctrlKey || e.metaKey) && e.key === '5') { e.preventDefault(); navigate('/history'); }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [navigate]);
+
   return (
     <div className="app-layout">
-      <Sidebar />
-      <main className="main-content">
+      <Sidebar onOpenCommandPalette={() => setCmdOpen(true)} />
+      <main className="main-content" style={{ position: 'relative' }}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/agents" element={<Agents />} />
@@ -38,6 +60,7 @@ function AppInner() {
           <Route path="/chat" element={<AgentChat />} />
           <Route path="/chat/:agentName" element={<AgentChat />} />
           <Route path="/collaboration" element={<PartyChat />} />
+          <Route path="/history" element={<DocHistory />} />
           <Route path="/ai-settings" element={<AISettings />} />
           <Route path="/sessions" element={<Sessions />} />
           <Route path="/queue" element={<QueueMonitor />} />
@@ -47,6 +70,7 @@ function AppInner() {
           <Route path="/tasks" element={<Tasks />} />
         </Routes>
       </main>
+      <CommandPalette isOpen={cmdOpen} onClose={() => setCmdOpen(false)} />
     </div>
   );
 }

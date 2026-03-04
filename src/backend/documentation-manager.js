@@ -699,6 +699,67 @@ messages: ${messages.length}
     return lower;
   }
 
+  /**
+   * Export a project folder as a ZIP archive.
+   * Uses PowerShell on Windows, zip on macOS/Linux.
+   */
+  async exportProjectZip(projectId, destPath) {
+    const project = this.projects.get(projectId || this.activeProjectId);
+    if (!project) throw new Error('PROJECT_NOT_FOUND');
+
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execP = util.promisify(exec);
+
+    if (process.platform === 'win32') {
+      const src = project.path.replace(/\\/g, '\\\\');
+      const dst = destPath.replace(/\\/g, '\\\\');
+      await execP(`powershell -NoProfile -Command "Compress-Archive -Path '${src}' -DestinationPath '${dst}' -Force"`);
+    } else {
+      const srcDir = path.dirname(project.path);
+      const srcBase = path.basename(project.path);
+      await execP(`cd "${srcDir}" && zip -r "${destPath}" "${srcBase}"`);
+    }
+    return { success: true, path: destPath };
+  }
+
+  /**
+   * Write (create or overwrite) a document file in a project.
+   * Used by the inline Markdown editor.
+   */
+  async writeDocument(projectId, relativePath, content) {
+    const project = this.projects.get(projectId || this.activeProjectId);
+    if (!project) throw new Error('PROJECT_NOT_FOUND');
+
+    const fullPath = path.join(project.path, relativePath);
+    if (!fullPath.startsWith(project.path)) throw new Error('INVALID_PATH');
+
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, content, 'utf8');
+
+    // Update project metadata
+    project.documentCount = await this._countDocuments(project.path);
+    project.updatedAt = Date.now();
+    await this._saveMeta(project);
+
+    return { success: true, path: relativePath, size: Buffer.byteLength(content, 'utf8') };
+  }
+
+  async _countDocuments(dir) {
+    try {
+      let count = 0;
+      const scan = async (d) => {
+        const entries = await fs.readdir(d, { withFileTypes: true });
+        for (const e of entries) {
+          if (e.isDirectory() && !e.name.startsWith('.')) await scan(path.join(d, e.name));
+          else if (e.isFile() && e.name.endsWith('.md')) count++;
+        }
+      };
+      await scan(dir);
+      return count;
+    } catch { return 0; }
+  }
+
   async _saveMeta(project) {
     const meta = { ...project };
     await fs.writeFile(

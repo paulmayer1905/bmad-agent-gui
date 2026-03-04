@@ -9,17 +9,18 @@ const navItems = [
   { path: '/collaboration', icon: '🎉', label: 'Collaboration', highlight: true },
   { path: '/agents', icon: '🤖', label: 'Agents' },
   { section: 'Ressources' },
+  { path: '/history', icon: '📚', label: 'Historique' },
   { path: '/tasks', icon: '📝', label: 'Tâches' },
   { path: '/checklists', icon: '✅', label: 'Checklists' },
   { path: '/workflows', icon: '🔀', label: 'Workflows' },
   { section: 'Système' },
   { path: '/ai-settings', icon: '🧠', label: 'Paramètres IA' },
   { path: '/sessions', icon: '🔄', label: 'Sessions' },
-  { path: '/queue', icon: '📨', label: 'File d\'attente' },
+  { path: '/queue', icon: '📨', label: "File d'attente" },
   { path: '/config', icon: '⚙️', label: 'Configuration' },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onOpenCommandPalette }) {
   const location = useLocation();
   const [health, setHealth] = useState({ status: 'checking' });
   const [sessionCount, setSessionCount] = useState(0);
@@ -56,6 +57,15 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
+
+      {/* Command palette trigger */}
+      {onOpenCommandPalette && (
+        <div className="sidebar-search-trigger" onClick={onOpenCommandPalette}>
+          <span className="sidebar-search-icon">🔍</span>
+          <span className="sidebar-search-placeholder">Rechercher…</span>
+          <kbd className="sidebar-search-kbd">Ctrl+K</kbd>
+        </div>
+      )}
 
       <nav className="sidebar-nav">
         {navItems.map((item, i) => {

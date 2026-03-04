@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import PipelineVisualizer from '../components/PipelineVisualizer';
 
 // ─── Agent color palette ──────────────────────────────────────────────────
 const AGENT_COLORS = {
@@ -681,43 +682,23 @@ export default function PartyChat() {
                 </button>
               </div>
 
-              <div className="pipeline-exec-steps">
-                {pipelineSteps.map((step, i) => {
+              {/* Use the pipeline visualizer component */}
+              <PipelineVisualizer
+                steps={pipelineSteps.map(step => {
                   const agentMeta = agents.find(a => a.name === step.agent);
-                  return (
-                    <div key={i} className={`pipeline-exec-step pipeline-step-${step.status}`}>
-                      <div className="pipeline-exec-step-header">
-                        <span className="pipeline-step-num">{i + 1}</span>
-                        <span className="pipeline-step-icon" style={{ borderColor: getAgentColor(step.agent) }}>
-                          {agentMeta?.icon || '🤖'}
-                        </span>
-                        <div>
-                          <strong>{agentMeta?.title || step.agent}</strong>
-                          <div className="pipeline-step-task">{step.task}</div>
-                        </div>
-                        <span className={`pipeline-step-status status-${step.status}`}>
-                          {step.status === 'pending' ? '⏳ En attente' :
-                           step.status === 'running' ? '🔄 En cours...' :
-                           step.status === 'completed' ? '✅ Terminé' :
-                           '❌ Échoué'}
-                        </span>
-                      </div>
-                      {step.response && (
-                        <div className="pipeline-step-result">
-                          {step.response}
-                          {step.response.length >= 500 && '...'}
-                        </div>
-                      )}
-                      {step.filesWritten > 0 && (
-                        <div className="pipeline-step-files">
-                          📁 {step.filesWritten} fichier{step.filesWritten > 1 ? 's' : ''} généré{step.filesWritten > 1 ? 's' : ''} dans le workspace
-                        </div>
-                      )}
-                      {step.error && <div className="pipeline-step-error">❌ {step.error}</div>}
-                    </div>
-                  );
+                  const statusMap = { pending: 'waiting', running: 'running', completed: 'done', failed: 'error' };
+                  return {
+                    agent: agentMeta?.title || step.agent,
+                    agentIcon: agentMeta?.icon || '🤖',
+                    name: step.task || agentMeta?.title || step.agent,
+                    status: statusMap[step.status] || 'waiting',
+                    output: step.response
+                      ? step.response + (step.filesWritten > 0 ? `\n\n📁 ${step.filesWritten} fichier(s) généré(s)` : '')
+                      : null,
+                    error: step.error,
+                  };
                 })}
-              </div>
+              />
 
               {pipelineSteps.every(s => s.status === 'completed' || s.status === 'failed') && (
                 <div style={{ marginTop: '16px', textAlign: 'center' }}>
