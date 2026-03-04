@@ -396,6 +396,10 @@ const api = {
       if (isElectron) return window.bmadAPI.docProject.openFolder(id);
       return { success: false };
     },
+    onAutoSaved: (callback) => {
+      if (isElectron) return window.bmadAPI.docProject.onAutoSaved(callback);
+      return () => {}; // noop cleanup
+    },
   },
 };
 

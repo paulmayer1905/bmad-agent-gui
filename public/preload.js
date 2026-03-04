@@ -169,6 +169,10 @@ contextBridge.exposeInMainWorld('bmadAPI', {
     readFile: (projectId, relativePath) => ipcRenderer.invoke('doc:file:read', projectId, relativePath),
     saveConversation: (sessionId) => ipcRenderer.invoke('doc:conversation:save', sessionId),
     openFolder: (id) => ipcRenderer.invoke('doc:project:open', id),
+    onAutoSaved: (callback) => {
+      ipcRenderer.on('doc:autosaved', (_, data) => callback(data));
+      return () => ipcRenderer.removeAllListeners('doc:autosaved');
+    },
   },
 
   // Navigation events from menu

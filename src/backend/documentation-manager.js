@@ -243,15 +243,121 @@ ${Object.entries(AGENT_FOLDERS).map(([agent, { dir, label }]) => `| \`${dir}/\` 
   // ═══════════════════════════════════════════════════════════════════════
 
   /**
-   * Save an agent response as a documentation file.
+   * Language tag → file extension mapping for code block extraction.
+   */
+  static LANG_EXTENSIONS = {
+    javascript: 'js', js: 'js', jsx: 'jsx', typescript: 'ts', ts: 'ts', tsx: 'tsx',
+    python: 'py', py: 'py', ruby: 'rb', rb: 'rb', go: 'go', rust: 'rs', rs: 'rs',
+    java: 'java', kotlin: 'kt', swift: 'swift', csharp: 'cs', cs: 'cs', cpp: 'cpp',
+    c: 'c', php: 'php', html: 'html', css: 'css', scss: 'scss', less: 'less',
+    sql: 'sql', shell: 'sh', bash: 'sh', sh: 'sh', powershell: 'ps1', ps1: 'ps1',
+    yaml: 'yaml', yml: 'yaml', toml: 'toml', xml: 'xml', dockerfile: 'Dockerfile',
+    docker: 'Dockerfile', makefile: 'Makefile', cmake: 'cmake', lua: 'lua',
+    dart: 'dart', r: 'r', scala: 'scala', perl: 'pl', elixir: 'ex', haskell: 'hs',
+    vue: 'vue', svelte: 'svelte', graphql: 'graphql', proto: 'proto', tf: 'tf',
+    terraform: 'tf', nginx: 'conf', conf: 'conf', ini: 'ini', env: 'env',
+    bat: 'bat', cmd: 'cmd',
+  };
+
+  /**
+   * Parse ALL code blocks from a response.
+   * Returns: [{ filePath, language, ext, content, named }]
+   *
+   * Supports:
+   *   ```filename:path/file.ext          → named block with path
+   *   ```path/file.ext                   → named block with path
+   *   ```lang\n// FILE: path/file.ext    → named block (comment-style)
+   *   ```lang\n...                        → unnamed block, language known
+   *   ```\n...                            → unnamed block, language unknown
+   */
+  _parseCodeBlocks(responseContent) {
+    const blocks = [];
+    // We do a single pass through the content looking for fenced code blocks
+    const fenceRegex = /```([^\n]*)\n([\s\S]*?)```/g;
+    let match;
+    while ((match = fenceRegex.exec(responseContent)) !== null) {
+      const info = match[1].trim();
+      let content = match[2];
+      let filePath = null;
+      let language = null;
+
+      // Case 1: ```filename:path/to/file.ext  or  ```path/to/file.ext
+      const fileInfoMatch = info.match(/^(?:filename:)?([^\s]+\.[a-zA-Z0-9]+)$/);
+      if (fileInfoMatch) {
+        filePath = fileInfoMatch[1];
+        const ext = path.extname(filePath).slice(1).toLowerCase();
+        language = ext;
+      } else {
+        // Case 2: info string is a language tag (e.g. "javascript", "python")
+        language = info.split(/\s/)[0].toLowerCase() || null;
+      }
+
+      // Case 3: First line has // FILE: path or # FILE: path
+      if (!filePath && content) {
+        const commentFileMatch = content.match(/^\s*(?:\/\/|#|<!--|\/\*)\s*FILE:\s*([^\n*>]+?)(?:-->|\*\/)?\s*\n/);
+        if (commentFileMatch) {
+          filePath = commentFileMatch[1].trim();
+          content = content.replace(commentFileMatch[0], ''); // strip the FILE: line
+        }
+      }
+
+      // Skip mermaid/json/svg blocks (handled separately)
+      if (['mermaid', 'json', 'svg'].includes(language)) continue;
+
+      const ext = filePath
+        ? path.extname(filePath).slice(1).toLowerCase()
+        : (DocumentationManager.LANG_EXTENSIONS[language] || null);
+
+      blocks.push({
+        filePath: filePath || null,
+        language,
+        ext,
+        content: content.trimEnd(),
+        named: !!filePath,
+      });
+    }
+    return blocks;
+  }
+
+  /**
+   * Build clean artifact content from the response.
+   *
+   * For document agents (analyst, architect, po, pm, ux-expert, qa, sm):
+   *   → strip the markdown fences and return the body as a clean .md
+   *
+   * Returns null if response is too short or looks like a simple chat reply.
+   */
+  _buildCleanDocument(responseContent, docType, title) {
+    // Don't produce a doc artifact for very short responses (under ~150 chars of real text)
+    const textOnly = responseContent.replace(/```[\s\S]*?```/g, '').trim();
+    if (textOnly.length < 100) return null;
+
+    // If there is no heading AND no list AND no table → likely a chat reply, not a document
+    if (!/^#{1,3}\s/m.test(responseContent) &&
+        !/^[-*]\s/m.test(responseContent) &&
+        !/^\|/m.test(responseContent)) {
+      return null;
+    }
+
+    return responseContent;
+  }
+
+  /**
+   * Save an agent response as documentation — with full artifact extraction.
    * Called automatically after each agent response completes.
+   *
+   * Produces:
+   *   1. A reference log (.md with front-matter) in _historique/
+   *   2. A clean editable document artifact in the agent folder (if doc-type)
+   *   3. Individual source files for every code block (in a sub-directory)
+   *   4. Extracted SVG, Mermaid (.mmd), JSON files
    *
    * @param {string} agentName - Agent key (e.g. 'architect', 'dev')
    * @param {string} agentTitle - Display name
    * @param {string} userQuestion - The user's question/request
    * @param {string} responseContent - The agent's full response
    * @param {Object} options - { sessionId, usage, projectId }
-   * @returns {{ filePath, docType, title }}
+   * @returns {{ filePath, docType, title, artifacts[] }}
    */
   async saveAgentResponse(agentName, agentTitle, userQuestion, responseContent, options = {}) {
     const projectId = options.projectId || this.activeProjectId;
@@ -271,10 +377,17 @@ ${Object.entries(AGENT_FOLDERS).map(([agent, { dir, label }]) => `| \`${dir}/\` 
     const title = extractTitle(responseContent, userQuestion.slice(0, 60));
     const safeTitle = sanitize(title);
     const ts = timestamp();
-    const fileName = `${ts}-${docType}-${safeTitle}.md`;
-    const filePath = path.join(targetDir, fileName);
 
-    // Build front-matter
+    // All produced artifact paths
+    const artifacts = [];
+
+    // ── 1. Reference log → _historique/ ──────────────────────────────
+    const histDir = path.join(project.path, HISTORY_DIR);
+    await fs.mkdir(histDir, { recursive: true });
+
+    const logFileName = `${ts}-${agentKey}-${docType}-${safeTitle}.md`;
+    const logFilePath = path.join(histDir, logFileName);
+
     const frontMatter = [
       '---',
       `title: "${title.replace(/"/g, '\\"')}"`,
@@ -288,12 +401,63 @@ ${Object.entries(AGENT_FOLDERS).map(([agent, { dir, label }]) => `| \`${dir}/\` 
       '---',
     ].filter(Boolean).join('\n');
 
-    // Write file
-    const content = `${frontMatter}\n\n${responseContent}`;
-    await fs.writeFile(filePath, content, 'utf8');
+    await fs.writeFile(logFilePath, `${frontMatter}\n\n${responseContent}`, 'utf8');
 
-    // Handle SVG extraction: if content contains <svg>, save a separate .svg
-    const svgFiles = [];
+    // ── 2. Clean document artifact → agent folder ────────────────────
+    const cleanDoc = this._buildCleanDocument(responseContent, docType, title);
+    if (cleanDoc) {
+      const docFileName = `${ts}-${docType}-${safeTitle}.md`;
+      const docFilePath = path.join(targetDir, docFileName);
+      await fs.writeFile(docFilePath, cleanDoc, 'utf8');
+      artifacts.push({ type: 'document', path: docFilePath, name: docFileName });
+    }
+
+    // ── 3. Code blocks → individual source files ─────────────────────
+    const codeBlocks = this._parseCodeBlocks(responseContent);
+    if (codeBlocks.length > 0) {
+      // If there are named files, create a sub-directory for the code
+      const hasNamedFiles = codeBlocks.some(b => b.named);
+      const codeDir = hasNamedFiles
+        ? path.join(targetDir, `${ts}-${safeTitle}-code`)
+        : targetDir;
+
+      if (hasNamedFiles) {
+        await fs.mkdir(codeDir, { recursive: true });
+      }
+
+      let unnamedIdx = 0;
+      for (const block of codeBlocks) {
+        if (!block.content.trim()) continue;
+
+        let fileDest;
+        if (block.named) {
+          // Named file: preserve its path structure inside the code sub-dir
+          fileDest = path.join(codeDir, block.filePath);
+        } else {
+          // Unnamed file: generate a name from the language
+          unnamedIdx++;
+          const ext = block.ext || 'txt';
+          const codeFileName = `code-${unnamedIdx}.${ext}`;
+          fileDest = path.join(targetDir, `${ts}-${codeFileName}`);
+        }
+
+        try {
+          await fs.mkdir(path.dirname(fileDest), { recursive: true });
+          await fs.writeFile(fileDest, block.content, 'utf8');
+          artifacts.push({
+            type: 'code',
+            path: fileDest,
+            name: path.basename(fileDest),
+            language: block.language,
+            named: block.named,
+          });
+        } catch (err) {
+          console.error(`[DocManager] Failed to write code artifact ${fileDest}:`, err.message);
+        }
+      }
+    }
+
+    // ── 4. SVG extraction ────────────────────────────────────────────
     if (responseContent.includes('<svg') && responseContent.includes('</svg>')) {
       const svgRegex = /<svg[\s\S]*?<\/svg>/g;
       let svgMatch;
@@ -303,12 +467,11 @@ ${Object.entries(AGENT_FOLDERS).map(([agent, { dir, label }]) => `| \`${dir}/\` 
         const svgFileName = `${ts}-${docType}-${safeTitle}-${svgIndex}.svg`;
         const svgPath = path.join(targetDir, svgFileName);
         await fs.writeFile(svgPath, svgMatch[0], 'utf8');
-        svgFiles.push(svgPath);
+        artifacts.push({ type: 'svg', path: svgPath, name: svgFileName });
       }
     }
 
-    // Handle Mermaid extraction: save as .mmd files
-    const mermaidFiles = [];
+    // ── 5. Mermaid extraction → .mmd ─────────────────────────────────
     const mermaidRegex = /```mermaid\s*\n([\s\S]*?)```/g;
     let mmdMatch;
     let mmdIndex = 0;
@@ -317,11 +480,10 @@ ${Object.entries(AGENT_FOLDERS).map(([agent, { dir, label }]) => `| \`${dir}/\` 
       const mmdFileName = `${ts}-${docType}-${safeTitle}-${mmdIndex}.mmd`;
       const mmdPath = path.join(targetDir, mmdFileName);
       await fs.writeFile(mmdPath, mmdMatch[1].trim(), 'utf8');
-      mermaidFiles.push(mmdPath);
+      artifacts.push({ type: 'mermaid', path: mmdPath, name: mmdFileName });
     }
 
-    // Handle JSON extraction: save structured data as .json
-    const jsonFiles = [];
+    // ── 6. JSON extraction → .json ───────────────────────────────────
     const jsonRegex = /```json\s*\n([\s\S]*?)```/g;
     let jsonMatch;
     let jsonIndex = 0;
@@ -332,31 +494,58 @@ ${Object.entries(AGENT_FOLDERS).map(([agent, { dir, label }]) => `| \`${dir}/\` 
         const jsonFileName = `${ts}-${docType}-${safeTitle}-${jsonIndex}.json`;
         const jsonPath = path.join(targetDir, jsonFileName);
         await fs.writeFile(jsonPath, jsonMatch[1].trim(), 'utf8');
-        jsonFiles.push(jsonPath);
+        artifacts.push({ type: 'json', path: jsonPath, name: jsonFileName });
       } catch { /* not valid JSON, skip */ }
     }
 
-    // Update project stats
-    project.documentCount++;
+    // ── 7. YAML extraction → .yaml ──────────────────────────────────
+    const yamlRegex = /```ya?ml\s*\n([\s\S]*?)```/g;
+    let yamlMatch;
+    let yamlIndex = 0;
+    while ((yamlMatch = yamlRegex.exec(responseContent)) !== null) {
+      yamlIndex++;
+      const yamlFileName = `${ts}-${docType}-${safeTitle}-${yamlIndex}.yaml`;
+      const yamlPath = path.join(targetDir, yamlFileName);
+      await fs.writeFile(yamlPath, yamlMatch[1].trim(), 'utf8');
+      artifacts.push({ type: 'yaml', path: yamlPath, name: yamlFileName });
+    }
+
+    // ── 8. HTML extraction → .html (standalone HTML blocks) ─────────
+    const htmlRegex = /```html\s*\n([\s\S]*?)```/g;
+    let htmlMatch;
+    let htmlIndex = 0;
+    while ((htmlMatch = htmlRegex.exec(responseContent)) !== null) {
+      const htmlContent = htmlMatch[1].trim();
+      // Only save as standalone HTML if it looks like a full document or significant fragment
+      if (htmlContent.includes('<!DOCTYPE') || htmlContent.includes('<html') || htmlContent.length > 200) {
+        htmlIndex++;
+        const htmlFileName = `${ts}-${docType}-${safeTitle}-${htmlIndex}.html`;
+        const htmlPath = path.join(targetDir, htmlFileName);
+        await fs.writeFile(htmlPath, htmlContent, 'utf8');
+        artifacts.push({ type: 'html', path: htmlPath, name: htmlFileName });
+      }
+    }
+
+    // ── Update project stats ─────────────────────────────────────────
+    project.documentCount += 1 + artifacts.length;
     if (!project.agents[agentKey]) {
       project.agents[agentKey] = { docCount: 0, lastActivity: 0 };
     }
-    project.agents[agentKey].docCount++;
+    project.agents[agentKey].docCount += 1 + artifacts.length;
     project.agents[agentKey].lastActivity = Date.now();
     project.updatedAt = Date.now();
     await this._saveMeta(project);
 
-    const relativePath = path.relative(project.path, filePath).replace(/\\/g, '/');
-
     return {
-      filePath,
-      relativePath,
-      fileName,
+      filePath: logFilePath,
+      relativePath: path.relative(project.path, logFilePath).replace(/\\/g, '/'),
+      fileName: logFileName,
       docType,
       title,
       agentKey,
       folder: folderInfo.dir,
-      extraFiles: [...svgFiles, ...mermaidFiles, ...jsonFiles]
+      artifacts,
+      artifactCount: artifacts.length,
     };
   }
 

@@ -155,10 +155,21 @@ function registerIpcHandlers() {
 
   // Chat / AI
   safeHandle('chat:start', (_, agentName) => backend.startChat(agentName));
-  safeHandle('chat:send', async (_, sessionId, message) => {
+  safeHandle('chat:send', async (event, sessionId, message) => {
     const result = await backend.sendChatMessage(sessionId, message);
-    // Auto-save to doc project (fire and forget)
-    backend.saveAgentDoc(sessionId, message, result.content).catch(() => {});
+    // Auto-save to doc project and notify renderer of artifacts
+    backend.saveAgentDoc(sessionId, message, result.content)
+      .then(saveResult => {
+        if (saveResult && !event.sender.isDestroyed()) {
+          event.sender.send('doc:autosaved', {
+            docType: saveResult.docType,
+            title: saveResult.title,
+            artifactCount: saveResult.artifactCount || 0,
+            artifacts: (saveResult.artifacts || []).map(a => ({ type: a.type, name: a.name })),
+          });
+        }
+      })
+      .catch(() => {});
     return result;
   });
   safeHandle('chat:history', (_, sessionId) => backend.getChatHistory(sessionId));
@@ -319,8 +330,19 @@ function registerIpcHandlers() {
       if (!event.sender.isDestroyed()) {
         event.sender.send('chat:stream:done', sessionId, result);
       }
-      // Auto-save to doc project (fire and forget)
-      backend.saveAgentDoc(sessionId, message, result.content).catch(() => {});
+      // Auto-save to doc project and notify renderer of artifacts
+      backend.saveAgentDoc(sessionId, message, result.content)
+        .then(saveResult => {
+          if (saveResult && !event.sender.isDestroyed()) {
+            event.sender.send('doc:autosaved', {
+              docType: saveResult.docType,
+              title: saveResult.title,
+              artifactCount: saveResult.artifactCount || 0,
+              artifacts: (saveResult.artifacts || []).map(a => ({ type: a.type, name: a.name })),
+            });
+          }
+        })
+        .catch(() => {});
     } catch (error) {
       if (!event.sender.isDestroyed()) {
         event.sender.send('chat:stream:error', sessionId, error.message);

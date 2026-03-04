@@ -197,6 +197,21 @@ export default function AgentChat() {
     loadProjects();
   }, []);
 
+  // Listen for auto-save notifications (artifact extraction feedback)
+  useEffect(() => {
+    const cleanup = api.docProject.onAutoSaved((data) => {
+      if (data.artifactCount > 0) {
+        const types = data.artifacts.map(a => a.type).filter((v, i, arr) => arr.indexOf(v) === i);
+        const label = `${data.artifactCount} artefact${data.artifactCount > 1 ? 's' : ''} (${types.join(', ')})`;
+        setDocSavedIndicator({ fileName: label, agent: data.docType });
+      } else {
+        setDocSavedIndicator({ fileName: data.title || data.docType, agent: data.docType });
+      }
+      setTimeout(() => setDocSavedIndicator(null), 4000);
+    });
+    return cleanup;
+  }, []);
+
   // Auto-start chat immediately when navigating with an agent name
   useEffect(() => {
     if (agentName && agentsLoaded && !session && !starting && !autoStarted.current) {
@@ -834,7 +849,7 @@ export default function AgentChat() {
           </div>
         )}
         {docSavedIndicator && (
-          <div className="doc-saved-indicator">✅ Sauvegardé: {docSavedIndicator.fileName}</div>
+          <div className="doc-saved-indicator">📁 Sauvegardé: {docSavedIndicator.fileName}</div>
         )}
       </div>
 
