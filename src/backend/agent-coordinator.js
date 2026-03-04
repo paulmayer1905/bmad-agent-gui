@@ -6,8 +6,240 @@
 const crypto = require('crypto');
 const EventEmitter = require('events');
 
-// ─── Instruction templates for code-generating pipeline steps ────────────
+// ─── Instruction templates for pipeline steps ───────────────────────────
 
+// ── ANALYST ──────────────────────────────────────────────────────────────
+const ANALYST_INSTRUCTIONS = `Réalise une analyse complète et structurée du besoin décrit.
+
+Tu DOIS produire un document d'analyse contenant :
+
+## 1. Résumé exécutif
+- Reformulation claire du besoin en 2-3 phrases
+- Objectif principal de l'application/du produit
+
+## 2. Analyse des utilisateurs
+- Profils utilisateurs cibles (personas simplifiées)
+- Cas d'usage principaux
+- Parcours utilisateur type
+
+## 3. Fonctionnalités identifiées
+Liste EXHAUSTIVE des fonctionnalités, classées par priorité :
+- 🔴 **Must-Have** (MVP) — fonctionnalités indispensables au lancement
+- 🟡 **Should-Have** — importantes mais non bloquantes
+- 🟢 **Nice-to-Have** — améliorations futures
+
+## 4. Contraintes et risques
+- Contraintes techniques identifiées
+- Risques potentiels et mitigations
+
+## 5. Recommandation technique
+Recommande le type d'application :
+- (a) Webapp (HTML/CSS/JS)
+- (b) Application desktop (Electron)
+- (c) API/Backend (Node.js/Python)
+- (d) Application fullstack
+Justifie ton choix.
+
+IMPORTANT : Sois exhaustif dans l'identification des fonctionnalités. Un jeu Snake par exemple a au minimum : affichage du plateau, déplacement du serpent, génération de nourriture, détection de collisions, score, game over, redémarrage, etc.`;
+
+// ── PM / PRD ─────────────────────────────────────────────────────────────
+const PM_PRD_INSTRUCTIONS = `Rédige un Product Requirements Document (PRD) complet et structuré.
+
+Basé sur l'analyse précédente, produis un PRD professionnel avec :
+
+## 1. Vision produit
+- Énoncé de vision (1 phrase)
+- Problème résolu
+- Public cible
+
+## 2. Objectifs et métriques de succès
+- 3-5 objectifs mesurables
+- KPIs associés
+
+## 3. Périmètre
+- **In scope** : ce qui est inclus dans cette version
+- **Out of scope** : ce qui est exclu explicitement
+
+## 4. Épics et User Stories
+STRUCTURE OBLIGATOIRE — Organise les fonctionnalités en Épics, chaque Épic contenant plusieurs User Stories :
+
+### Épic 1 : [Nom de l'épic]
+> Description de l'épic et de sa valeur métier
+
+| ID | User Story | Priorité | Critères d'acceptation |
+|----|-----------|----------|----------------------|
+| US-1.1 | En tant que [persona], je veux [action] afin de [bénéfice] | Must-Have | - Critère 1\\n- Critère 2\\n- Critère 3 |
+| US-1.2 | En tant que [persona], je veux [action] afin de [bénéfice] | Must-Have | - Critère 1\\n- Critère 2 |
+
+### Épic 2 : [Nom de l'épic]
+> Description...
+(idem)
+
+RÈGLES pour les User Stories :
+- Chaque épic doit contenir AU MINIMUM 2-3 user stories
+- Un projet même simple DOIT avoir au minimum 3 épics et 8-10 user stories
+- Chaque user story DOIT avoir des critères d'acceptation testables (minimum 2)
+- Utilise le format : "En tant que [persona], je veux [action] afin de [bénéfice]"
+- Les IDs suivent le format US-[épic].[story] (ex: US-1.1, US-2.3)
+
+Exemple pour un jeu Snake :
+- Épic 1 : Mécanique de jeu de base (US-1.1 Affichage plateau, US-1.2 Mouvement serpent, US-1.3 Nourriture, US-1.4 Croissance)
+- Épic 2 : Règles et score (US-2.1 Détection collisions, US-2.2 Score, US-2.3 Game Over, US-2.4 Redémarrage)
+- Épic 3 : Interface et UX (US-3.1 Menu principal, US-3.2 Affichage score, US-3.3 Responsive/Clavier)
+- Épic 4 : Polish et améliorations (US-4.1 Vitesse progressive, US-4.2 Meilleur score, US-4.3 Sons/effets visuels)
+
+## 5. Exigences non-fonctionnelles
+- Performance, accessibilité, compatibilité
+
+## 6. Dépendances et hypothèses
+- Dépendances techniques
+- Hypothèses faites
+
+IMPORTANT : Ne produis JAMAIS un PRD avec une seule user story. Même le projet le plus simple a plusieurs fonctionnalités distinctes qui doivent être décomposées.`;
+
+// ── PO / BACKLOG ─────────────────────────────────────────────────────────
+const PO_BACKLOG_INSTRUCTIONS = `Tu es le Product Owner. À partir du PRD fourni, valide et affine le backlog produit.
+
+Tu DOIS :
+
+## 1. Validation du PRD
+- Vérifie la cohérence entre les épics
+- Identifie les user stories manquantes
+- Vérifie que chaque user story a des critères d'acceptation testables
+
+## 2. Backlog priorisé
+Reprends et affine les user stories du PRD dans un backlog ordonné :
+
+### Sprint 1 (MVP)
+| Priorité | ID | User Story | Points | Dépendances |
+|----------|-----|-----------|--------|-------------|
+| 1 | US-X.X | ... | S/M/L/XL | - |
+
+### Sprint 2
+(idem)
+
+### Backlog futur
+(stories Nice-to-Have)
+
+## 3. Critères d'acceptation enrichis
+Pour CHAQUE user story du Sprint 1, détaille les critères d'acceptation :
+
+#### US-X.X : [titre court]
+**Critères d'acceptation :**
+- [ ] Critère précis et testable 1
+- [ ] Critère précis et testable 2
+- [ ] Critère précis et testable 3
+
+**Notes de dev :**
+- Indications techniques si pertinent
+
+## 4. Definition of Done (DoD)
+- Critères généraux pour considérer une story "done"
+
+RÈGLES :
+- Le backlog doit contenir AU MINIMUM 8 user stories pour un projet simple, 15+ pour un projet complexe
+- Chaque story doit avoir au minimum 2 critères d'acceptation avec des checkbox [ ]
+- Les stories doivent être ordonnées par dépendance logique (on ne peut pas scorer sans plateau de jeu)
+- Estime la complexité en tailles de t-shirt (S/M/L/XL)`;
+
+// ── ARCHITECT ────────────────────────────────────────────────────────────
+const ARCHITECT_INSTRUCTIONS = `Conçois l'architecture technique complète de l'application.
+
+Basé sur le PRD et le backlog produit, tu DOIS fournir :
+
+## 1. Choix de la stack technique
+- Langage / Framework principal avec justification
+- Dépendances et bibliothèques
+- Outils de build/bundling
+
+## 2. Structure du projet
+Fournis la structure EXACTE des fichiers :
+\`\`\`
+mon-app/
+├── package.json
+├── README.md
+├── src/
+│   ├── index.js
+│   ├── game/           (ou modules métier)
+│   │   ├── engine.js
+│   │   └── ...
+│   ├── ui/
+│   │   ├── renderer.js
+│   │   └── ...
+│   └── utils/
+│       └── ...
+├── public/
+│   └── index.html
+├── styles/
+│   └── main.css
+└── tests/
+    └── ...
+\`\`\`
+
+## 3. Modules et composants
+Pour CHAQUE module/fichier listé :
+- Responsabilité
+- Dépendances (imports)
+- Interface publique (fonctions/classes exposées)
+
+## 4. Modèle de données
+- Structures de données principales
+- État de l'application
+
+## 5. Flux de contrôle
+- Diagramme ou description du flux principal (game loop, event handling, etc.)
+
+## 6. Commandes d'installation et lancement
+\`\`\`bash
+npm install    # ou équivalent
+npm start      # ou équivalent
+npm test       # ou équivalent
+\`\`\`
+
+## 7. Correspondance Backlog → Architecture
+Indique quel module implémente quelle user story.
+
+IMPORTANT :
+- Si l'application est destinée au bureau : recommande Electron
+- Si c'est une webapp simple : HTML/CSS/JS pur ou un framework léger
+- La structure doit supporter TOUTES les user stories du backlog`;
+
+// ── UX DESIGN ────────────────────────────────────────────────────────────
+const UX_DESIGN_INSTRUCTIONS = `Conçois le design UX/UI complet de l'application.
+
+Basé sur le PRD, le backlog, et l'architecture, tu DOIS fournir :
+
+## 1. Principes de design
+- Style visuel (minimaliste, ludique, professionnel, etc.)
+- Palette de couleurs (codes hex)
+- Typographie
+
+## 2. Wireframes
+Produis un wireframe SVG pour CHAQUE écran principal :
+- Écran principal / Page d'accueil
+- Écrans secondaires (menu, settings, game over, etc.)
+- États vides et états d'erreur
+
+Chaque wireframe DOIT être dans un bloc \`\`\`svg avec des groupes nommés.
+
+## 3. Composants UI
+Liste les composants réutilisables :
+- Boutons (types et états)
+- Cartes / Panneaux
+- Modales
+- Indicateurs (score, progression)
+
+## 4. Guide de navigation
+- Flux de navigation entre écrans
+- Transitions et animations suggérées
+
+## 5. Responsive design
+- Breakpoints
+- Adaptations mobile/tablette si pertinent
+
+IMPORTANT : Les wireframes doivent couvrir TOUS les écrans nécessaires aux user stories du Sprint 1.`;
+
+// ── DEV / CODE ───────────────────────────────────────────────────────────
 const CODE_GEN_INSTRUCTIONS = `Implémente le CODE COMPLET et FONCTIONNEL pour cette tâche.
 
 RÈGLES CRITIQUES :
@@ -21,10 +253,12 @@ RÈGLES CRITIQUES :
 3. Inclus TOUS les fichiers nécessaires : code source, config, package.json, README.md
 4. Le code doit compiler et fonctionner directement sans modification
 5. Utilise les bonnes pratiques et une architecture propre
-6. Inclus les dépendances dans package.json (ou requirements.txt pour Python)`;
+6. Inclus les dépendances dans package.json (ou requirements.txt pour Python)
+7. Respecte la structure de fichiers définie par l'architecte
+8. Implémente TOUTES les user stories du Sprint 1 du backlog`;
 
 const FULL_APP_CODE_INSTRUCTIONS = `Tu dois générer le CODE SOURCE COMPLET d'une application fonctionnelle.
-Basé sur l'architecture, le design UX, et l'analyse précédents, produis TOUS les fichiers nécessaires.
+Basé sur l'architecture, le design UX, le backlog, et les user stories, produis TOUS les fichiers nécessaires.
 
 RÈGLES CRITIQUES :
 1. Utilise ce format pour CHAQUE FICHIER :
@@ -41,54 +275,67 @@ RÈGLES CRITIQUES :
 7. Si c'est une app desktop : configure Electron avec main.js et preload.js
 8. Ajoute un README.md avec les instructions d'installation et de lancement
 9. Le design doit correspondre aux wireframes UX fournis
-10. Utilise un style CSS moderne et responsive`;
+10. Utilise un style CSS moderne et responsive
 
-const ARCHITECT_INSTRUCTIONS = `Conçois l'architecture technique complète de l'application.
+IMPORTANT — COUVERTURE FONCTIONNELLE :
+- Tu DOIS implémenter TOUTES les user stories du Sprint 1 (MVP)
+- Chaque critère d'acceptation doit être implémenté dans le code
+- Vérifie que chaque fonctionnalité listée dans le backlog est couverte
+- À la fin, liste la correspondance US → fichiers implémentés`;
 
-Tu DOIS fournir :
-1. Le choix de la stack technique avec justification (framework, langage, dépendances)
-2. La structure EXACTE des fichiers du projet sous forme d'arbre, par exemple :
-   mon-app/
-   ├── package.json
-   ├── src/
-   │   ├── index.js
-   │   ├── components/
-   │   └── styles/
-   └── public/
-       └── index.html
-3. La description de chaque module/composant principal
-4. Les dépendances npm/pip exactes à installer
-5. Les commandes pour installer et lancer l'application
-6. Si l'application est destinée au bureau : recommande Electron
-7. Si c'est une webapp : recommande un serveur léger ou une SPA statique`;
+// ── QA / TESTS ───────────────────────────────────────────────────────────
+const QA_TEST_INSTRUCTIONS = `Écris les tests COMPLETS pour l'application ET valide la couverture du backlog.
 
-const QA_TEST_INSTRUCTIONS = `Écris les tests COMPLETS pour l'application.
+## 1. Vérification de la couverture
+Vérifie que CHAQUE user story du Sprint 1 est implémentée :
 
-RÈGLES :
-1. Produis de vrais fichiers de test avec ce format :
+| US | Story | Implémentée ? | Fichier(s) | Commentaire |
+|----|-------|:---:|---------|-------------|
+| US-1.1 | ... | ✅/❌ | ... | ... |
+
+## 2. Tests unitaires
+Produis de vrais fichiers de test avec ce format :
 
 \`\`\`filename:tests/nom-du-test.test.js
 // code de test complet
 \`\`\`
 
-2. Couvre les cas principaux, les cas limites, et les erreurs
-3. Si c'est du JS : utilise Jest ou le framework de test du projet
-4. Les tests doivent être exécutables avec "npm test" ou équivalent
-5. Inclus aussi des suggestions de tests manuels si pertinent`;
+- Un fichier de test par module/composant principal
+- Couvre les cas principaux, les cas limites, et les erreurs
+- Si c'est du JS : utilise Jest ou le framework de test du projet
+- Les tests doivent être exécutables avec "npm test" ou équivalent
 
+## 3. Tests d'acceptation
+Pour chaque user story, vérifie les critères d'acceptation :
+- [ ] US-X.X Critère 1 → résultat
+- [ ] US-X.X Critère 2 → résultat
+
+## 4. Bugs et problèmes identifiés
+Liste les bugs, incohérences, ou manques trouvés avec sévérité (Critique/Majeur/Mineur).
+
+## 5. Suggestions de tests manuels
+Scénarios de test manuels pour les aspects difficilement automatisables.`;
+
+// ── FIX & FINALIZE ───────────────────────────────────────────────────────
 const FIX_AND_FINALIZE_INSTRUCTIONS = `Revois le code généré et les retours du QA.
 
-1. Corrige tous les problèmes identifiés par le QA
-2. Assure-toi que tous les fichiers sont cohérents entre eux
-3. Vérifie les imports/requires et les chemins
-4. Ajoute les fichiers manquants s'il y en a
-5. Produis les fichiers corrigés au format :
+1. Corrige TOUS les bugs identifiés par le QA (liste-les un par un avec le fix appliqué)
+2. Implémente les user stories manquantes signalées par le QA
+3. Assure-toi que tous les fichiers sont cohérents entre eux
+4. Vérifie les imports/requires et les chemins
+5. Ajoute les fichiers manquants s'il y en a
+6. Produis les fichiers corrigés au format :
 
 \`\`\`filename:chemin/vers/fichier.ext
 // code corrigé complet
 \`\`\`
 
-6. Produis un README.md final avec les instructions de démarrage complètes`;
+7. Produis un README.md final avec les instructions de démarrage complètes
+
+8. Produis un rapport final de couverture :
+| US | Story | Status |
+|----|-------|--------|
+| US-X.X | ... | ✅ Implémentée |`;
 
 class AgentCoordinator extends EventEmitter {
   constructor(options = {}) {
@@ -226,9 +473,9 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
         });
 
         try {
-          // Build the step prompt
+          // Build the step prompt with accumulated context from ALL previous steps
           const contextSummary = this.projectContext.buildContextForAgent(step.agent);
-          const stepPrompt = this._buildStepPrompt(step, previousOutput, contextSummary);
+          const stepPrompt = this._buildStepPrompt(step, previousOutput, contextSummary, state.results);
 
           // Delegate to the agent
           const result = await this.delegateToAgent(null, step.agent, stepPrompt, {
@@ -295,7 +542,7 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
     return state;
   }
 
-  _buildStepPrompt(step, previousOutput, contextSummary) {
+  _buildStepPrompt(step, previousOutput, contextSummary, allPreviousResults = []) {
     let prompt = '';
 
     if (step.task) {
@@ -304,14 +551,29 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
     if (step.instructions) {
       prompt += `INSTRUCTIONS : ${step.instructions}\n\n`;
     }
-    if (previousOutput) {
+
+    // For code-generating or validation steps, include ALL previous results
+    // so the agent can see the full PRD + backlog + architecture chain
+    const needsFullContext = step.extractCode ||
+      ['dev', 'qa'].includes(step.agent) ||
+      (step.artifactType && ['code', 'test'].includes(step.artifactType));
+
+    if (needsFullContext && allPreviousResults.length > 1) {
+      prompt += `--- CONTEXTE COMPLET DU PIPELINE ---\n`;
+      for (const result of allPreviousResults) {
+        const label = result.agentTitle || result.agentName || 'Agent';
+        prompt += `\n### Livrable de ${label} :\n${result.response}\n`;
+      }
+      prompt += `--- FIN DU CONTEXTE ---\n\n`;
+    } else if (previousOutput) {
       prompt += `--- RÉSULTAT DE L'ÉTAPE PRÉCÉDENTE ---\n${previousOutput}\n--- FIN ---\n\n`;
     }
+
     if (contextSummary) {
       prompt += contextSummary;
     }
 
-    prompt += '\n\nProduis un résultat détaillé et structuré pour cette étape.';
+    prompt += '\n\nProduis un résultat détaillé et structuré pour cette étape. Réponds en français.';
     return prompt;
   }
 
@@ -358,29 +620,31 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
       {
         id: 'analysis-to-architecture',
         name: 'Analyse → Architecture',
-        description: 'L\'Analyste étudie le besoin, l\'Architecte conçoit la solution',
+        description: 'Analyste → Architecte : de l\'idée à la conception technique',
         steps: [
-          { agent: 'analyst', task: 'Analyse des besoins', instructions: 'Analyse le besoin décrit et produis un document de spécifications.', artifactType: 'analysis', saveArtifact: true },
-          { agent: 'architect', task: 'Conception architecture', instructions: 'Conçois l\'architecture technique basée sur l\'analyse précédente.', artifactType: 'architecture', saveArtifact: true }
+          { agent: 'analyst', task: 'Analyse des besoins', instructions: ANALYST_INSTRUCTIONS, artifactType: 'analysis', saveArtifact: true },
+          { agent: 'architect', task: 'Conception architecture', instructions: ARCHITECT_INSTRUCTIONS, artifactType: 'architecture', saveArtifact: true }
         ]
       },
       {
         id: 'full-product-design',
         name: 'Conception produit complète',
-        description: 'Analyste → PM (PRD) → Architecte → UX',
+        description: 'Analyste → PM (PRD + Épics/Stories) → PO (Backlog) → Architecte → UX',
         steps: [
-          { agent: 'analyst', task: 'Étude de marché et besoins', instructions: 'Analyse le marché et les besoins utilisateurs.', artifactType: 'analysis', saveArtifact: true },
-          { agent: 'pm', task: 'Rédaction PRD', instructions: 'Rédige un Product Requirements Document basé sur l\'analyse.', artifactType: 'prd', saveArtifact: true },
-          { agent: 'architect', task: 'Architecture technique', instructions: 'Définis l\'architecture technique adaptée aux exigences du PRD.', artifactType: 'architecture', saveArtifact: true },
-          { agent: 'ux-expert', task: 'Design UX/UI', instructions: 'Propose le design UX en wireframes SVG basé sur le PRD et l\'architecture.', artifactType: 'design', saveArtifact: true }
+          { agent: 'analyst', task: 'Étude de marché et besoins', instructions: ANALYST_INSTRUCTIONS, artifactType: 'analysis', saveArtifact: true },
+          { agent: 'pm', task: 'Rédaction PRD avec Épics et User Stories', instructions: PM_PRD_INSTRUCTIONS, artifactType: 'prd', saveArtifact: true },
+          { agent: 'po', task: 'Validation et backlog priorisé', instructions: PO_BACKLOG_INSTRUCTIONS, artifactType: 'backlog', saveArtifact: true },
+          { agent: 'architect', task: 'Architecture technique', instructions: ARCHITECT_INSTRUCTIONS, artifactType: 'architecture', saveArtifact: true },
+          { agent: 'ux-expert', task: 'Design UX/UI', instructions: UX_DESIGN_INSTRUCTIONS, artifactType: 'design', saveArtifact: true }
         ]
       },
       {
         id: 'story-to-implementation',
-        name: 'Story → Dev → QA',
-        description: 'Le PM écrit la story, le Dev implémente du vrai code, le QA valide',
+        name: 'PRD → Backlog → Dev → QA',
+        description: 'PM rédige le PRD, PO crée le backlog, Dev implémente, QA valide',
         steps: [
-          { agent: 'pm', task: 'Rédaction user story', instructions: 'Rédige une user story détaillée avec critères d\'acceptation.', artifactType: 'story', saveArtifact: true },
+          { agent: 'pm', task: 'Rédaction PRD et user stories', instructions: PM_PRD_INSTRUCTIONS, artifactType: 'prd', saveArtifact: true },
+          { agent: 'po', task: 'Backlog priorisé et critères d\'acceptation', instructions: PO_BACKLOG_INSTRUCTIONS, artifactType: 'backlog', saveArtifact: true },
           { agent: 'dev', task: 'Implémentation du code', instructions: CODE_GEN_INSTRUCTIONS, artifactType: 'code', saveArtifact: true, extractCode: true },
           { agent: 'qa', task: 'Tests et validation', instructions: QA_TEST_INSTRUCTIONS, artifactType: 'test', saveArtifact: true, extractCode: true }
         ]
@@ -388,14 +652,16 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
       {
         id: 'full-app-development',
         name: '🚀 Développement complet d\'application',
-        description: 'L\'équipe complète conçoit et génère une application fonctionnelle installable',
+        description: 'Équipe complète : Analyste → PM → PO → Architecte → UX → Dev → QA → Fix',
         requiresWorkspace: true,
         steps: [
-          { agent: 'analyst', task: 'Analyse des besoins et faisabilité', instructions: 'Analyse le besoin décrit. Identifie les fonctionnalités clés, les utilisateurs cibles, et les contraintes techniques. Recommande si l\'application devrait être : (a) une webapp (HTML/CSS/JS), (b) une application desktop (Electron), (c) une API/backend (Node.js/Python), ou (d) une application fullstack. Justifie ton choix.', artifactType: 'analysis', saveArtifact: true },
+          { agent: 'analyst', task: 'Analyse des besoins et faisabilité', instructions: ANALYST_INSTRUCTIONS, artifactType: 'analysis', saveArtifact: true },
+          { agent: 'pm', task: 'PRD avec Épics et User Stories', instructions: PM_PRD_INSTRUCTIONS, artifactType: 'prd', saveArtifact: true },
+          { agent: 'po', task: 'Backlog priorisé et critères d\'acceptation', instructions: PO_BACKLOG_INSTRUCTIONS, artifactType: 'backlog', saveArtifact: true },
           { agent: 'architect', task: 'Architecture technique et structure fichiers', instructions: ARCHITECT_INSTRUCTIONS, artifactType: 'architecture', saveArtifact: true },
-          { agent: 'ux-expert', task: 'Design UX/UI', instructions: 'Basé sur l\'analyse et l\'architecture, conçois le design UX/UI. Produis des wireframes SVG détaillés pour chaque écran principal. Décris la navigation, la palette de couleurs, et les composants UI.', artifactType: 'design', saveArtifact: true },
+          { agent: 'ux-expert', task: 'Design UX/UI', instructions: UX_DESIGN_INSTRUCTIONS, artifactType: 'design', saveArtifact: true },
           { agent: 'dev', task: 'Génération du code complet', instructions: FULL_APP_CODE_INSTRUCTIONS, artifactType: 'code', saveArtifact: true, extractCode: true },
-          { agent: 'qa', task: 'Tests et validation', instructions: QA_TEST_INSTRUCTIONS, artifactType: 'test', saveArtifact: true, extractCode: true },
+          { agent: 'qa', task: 'Tests et validation de la couverture', instructions: QA_TEST_INSTRUCTIONS, artifactType: 'test', saveArtifact: true, extractCode: true },
           { agent: 'dev', task: 'Corrections et finalisation', instructions: FIX_AND_FINALIZE_INSTRUCTIONS, artifactType: 'code', saveArtifact: true, extractCode: true }
         ]
       },
@@ -404,9 +670,9 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
         name: 'Revue de code',
         description: 'Architecture review → QA review → Recommandations',
         steps: [
-          { agent: 'architect', task: 'Revue architecture', instructions: 'Évalue l\'architecture et la conception du code soumis. Identifie les problèmes structurels.', artifactType: 'analysis', saveArtifact: true },
-          { agent: 'qa', task: 'Revue qualité', instructions: 'Analyse la qualité du code : tests manquants, bugs potentiels, bonnes pratiques.', artifactType: 'test', saveArtifact: true },
-          { agent: 'dev', task: 'Synthèse et corrections', instructions: 'Synthétise les retours d\'architecture et QA. Propose les corrections concrètes.', artifactType: 'code', saveArtifact: true }
+          { agent: 'architect', task: 'Revue architecture', instructions: 'Évalue l\'architecture et la conception du code soumis. Identifie les problèmes structurels, les anti-patterns, et les améliorations possibles.', artifactType: 'analysis', saveArtifact: true },
+          { agent: 'qa', task: 'Revue qualité', instructions: 'Analyse la qualité du code : tests manquants, bugs potentiels, bonnes pratiques, sécurité, performance.', artifactType: 'test', saveArtifact: true },
+          { agent: 'dev', task: 'Synthèse et corrections', instructions: 'Synthétise les retours d\'architecture et QA. Propose et implémente les corrections concrètes.', artifactType: 'code', saveArtifact: true }
         ]
       }
     ];
@@ -563,11 +829,35 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
     }
 
     // LLM-based routing
-    const agentList = session.agents.map(a => `- ${a.name}: ${a.title}`).join('\n');
-    const routingPrompt = `Tu es un coordinateur d'équipe. Voici les agents disponibles :
+    const agentDescriptions = {
+      'analyst': 'Analyse des besoins, étude de marché, brainstorming, identification des fonctionnalités',
+      'pm': 'Rédaction du PRD, épics et user stories, product strategy, roadmap',
+      'po': 'Backlog priorisé, validation des user stories, critères d\'acceptation, sprint planning',
+      'architect': 'Architecture technique, choix de stack, structure du projet, conception système',
+      'ux-expert': 'Design UX/UI, wireframes, maquettes SVG, parcours utilisateur',
+      'dev': 'Développement, code, implémentation, debugging, refactoring',
+      'qa': 'Tests, qualité, revue de code, validation, bugs',
+      'sm': 'Scrum, sprints, rétrospective, agilité, facilitation',
+      'bmad-master': 'Aide BMAD, workflows, méthodologie',
+      'bmad-orchestrator': 'Orchestration globale, coordination multi-agent',
+    };
+    const agentList = session.agents.map(a => {
+      const desc = agentDescriptions[a.name] || a.title;
+      return `- ${a.name} (${a.title}): ${desc}`;
+    }).join('\n');
+    const routingPrompt = `Tu es un coordinateur d'équipe. Voici les agents disponibles et leurs domaines :
 ${agentList}
 
 Message de l'utilisateur : "${message}"
+
+RÈGLES de routage :
+- Si le message concerne des user stories, un backlog, ou des critères d'acceptation → po
+- Si le message concerne un PRD, des spécifications produit, ou des épics → pm
+- Si le message concerne l'analyse du besoin, l'étude de marché → analyst
+- Si le message concerne du code, du développement → dev
+- Si le message concerne des tests, de la qualité → qa
+- Si le message concerne l'architecture, la conception technique → architect
+- Si le message concerne le design, l'UX/UI → ux-expert
 
 Réponds UNIQUEMENT avec le nom (name) de l'agent le plus pertinent. Si 2 agents sont nécessaires, sépare-les par une virgule. Maximum 2 agents. FORMAT : uniquement les noms, rien d'autre.`;
 

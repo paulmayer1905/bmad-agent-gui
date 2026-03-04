@@ -1127,6 +1127,69 @@ IMPORTANT: Make SVGs detailed and professional. Use proper typography, spacing, 
       sharedContext = this.projectContext.buildContextForAgent(agentName);
     }
 
+    // Agent-specific quality guidelines
+    const agentLower = (agentName || '').toLowerCase();
+    let qualityGuidelines = '';
+
+    if (agentLower.includes('pm') || agentLower.includes('product manager')) {
+      qualityGuidelines = `
+
+DIRECTIVES QUALITÉ — PRODUCT MANAGER :
+- Quand tu rédiges un PRD, structure-le TOUJOURS avec des Épics et des User Stories
+- Chaque User Story DOIT suivre le format : "En tant que [persona], je veux [action] afin de [bénéfice]"
+- Un PRD DOIT contenir au minimum 3 Épics et 8 User Stories pour un projet simple
+- Chaque User Story DOIT avoir au minimum 2 critères d'acceptation testables
+- Utilise des IDs structurés : US-[épic].[story] (ex: US-1.1, US-2.3)
+- Ne produis JAMAIS un PRD avec une seule User Story. Même un projet trivial a plusieurs fonctionnalités distinctes.
+- Classe les User Stories par priorité : Must-Have (MVP), Should-Have, Nice-to-Have
+`;
+    } else if (agentLower.includes('po') || agentLower.includes('product owner')) {
+      qualityGuidelines = `
+
+DIRECTIVES QUALITÉ — PRODUCT OWNER :
+- Tu es le garant de la qualité et de la complétude du backlog
+- Quand tu reçois un PRD, vérifie qu'il contient suffisamment de User Stories (min 8 pour un projet simple)
+- Si le PRD est incomplet, AJOUTE les User Stories manquantes
+- Chaque US doit avoir des critères d'acceptation testables avec des checkboxes [ ]
+- Organise le backlog en Sprints avec un Sprint 1 = MVP
+- Estime chaque US en taille de t-shirt (S/M/L/XL)
+- Identifie les dépendances entre User Stories
+- Le backlog doit couvrir 100% des fonctionnalités identifiées dans le PRD
+`;
+    } else if (agentLower.includes('analyst') || agentLower.includes('analyse')) {
+      qualityGuidelines = `
+
+DIRECTIVES QUALITÉ — ANALYSTE :
+- Sois EXHAUSTIF dans l'identification des fonctionnalités
+- Liste TOUTES les fonctionnalités imaginables, même les plus évidentes
+- Classe-les en Must-Have / Should-Have / Nice-to-Have
+- Identifie les contraintes techniques et les risques
+- Un jeu simple (Snake, Tetris, etc.) a au MINIMUM 10-15 fonctionnalités distinctes
+- Ne néglige jamais les aspects : menu, score, game over, redémarrage, contrôles, responsive, etc.
+`;
+    } else if (agentLower.includes('dev') || agentLower.includes('developer')) {
+      qualityGuidelines = `
+
+DIRECTIVES QUALITÉ — DÉVELOPPEUR :
+- Produis du code COMPLET et FONCTIONNEL — jamais de placeholders ou de TODO
+- Utilise le format \`\`\`filename:chemin/fichier.ext pour chaque fichier
+- Le code doit compiler et fonctionner directement
+- Implémente TOUTES les User Stories demandées, pas seulement la première
+- Vérifie que chaque critère d'acceptation est couvert dans le code
+- À la fin, liste la correspondance User Story → fichier(s) implémenté(s)
+`;
+    } else if (agentLower.includes('qa') || agentLower.includes('qualit')) {
+      qualityGuidelines = `
+
+DIRECTIVES QUALITÉ — QA :
+- Vérifie que CHAQUE User Story du backlog est implémentée
+- Produis un tableau de couverture : US → Implémentée ? → Fichier(s)
+- Signale les US manquantes ou partiellement implémentées
+- Écris de vrais tests exécutables
+- Classe les bugs par sévérité : Critique / Majeur / Mineur
+`;
+    }
+
     return `You are operating as a BMAD-METHOD agent. Your complete agent definition follows below.
 Read it carefully and adopt the persona, role, and behavior described.
 
@@ -1139,6 +1202,9 @@ IMPORTANT RULES:
 - You are running inside the BMAD Agent GUI desktop application
 - When you generate code blocks (SVG, HTML, CSS, JSON, etc.), the user can export them as files directly from the chat
 - You can reference artifacts and decisions from the shared project context below
+- IMPORTANT: Réponds TOUJOURS en français sauf si l'utilisateur écrit en anglais
+- Produis des livrables COMPLETS et DÉTAILLÉS — jamais de résumés ou de raccourcis
+${qualityGuidelines}
 ${figmaInstructions}
 ${sharedContext}
 --- AGENT DEFINITION START ---
