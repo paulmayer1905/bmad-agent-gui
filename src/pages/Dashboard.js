@@ -161,7 +161,42 @@ export default function Dashboard() {
             🤖 {activeChats.length > 0 ? 'Démarrer une nouvelle conversation' : 'Choisissez un agent pour démarrer'}
           </h3>
           <div className="grid-3">
-            {agents.map(agent => (
+            {/* Party Mode — virtual card */}
+            <div
+              className="card card-clickable"
+              onClick={() => navigate('/collaboration')}
+              style={{ position: 'relative', overflow: 'hidden', cursor: 'pointer', border: '1px dashed var(--accent-purple)' }}
+            >
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+                background: 'linear-gradient(90deg, #f59e0b, #ef4444, #8b5cf6)'
+              }} />
+              <div className="card-header" style={{ marginTop: 4 }}>
+                <div className="card-icon" style={{
+                  background: 'linear-gradient(135deg, #f59e0b, #8b5cf6)',
+                  fontSize: 24
+                }}>🎊</div>
+                <div style={{ flex: 1 }}>
+                  <div className="card-title">Party Mode</div>
+                  <div className="card-subtitle" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>party-mode</div>
+                </div>
+              </div>
+              <div className="card-body" style={{ fontSize: 13, marginBottom: 12, lineHeight: 1.5 }}>
+                Invoquer tous les agents simultanément en mode collaboratif
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-sm btn-primary" style={{ flex: 1 }}
+                  onClick={e => { e.stopPropagation(); navigate('/collaboration'); }}>
+                  🎉 Lancer
+                </button>
+              </div>
+            </div>
+
+            {/* Meta-agents first, then specialists */}
+            {[...agents].sort((a, b) => {
+              const order = { 'bmad-orchestrator': 1, 'bmad-master': 2 };
+              return (order[a.name] || 99) - (order[b.name] || 99);
+            }).map(agent => (
               <div
                 key={agent.name}
                 className="card card-clickable"

@@ -766,10 +766,27 @@ export default function AgentChat() {
           </div>
         ) : (
           <div className="chat-agents-grid">
-            {agents.map(agent => (
+            {/* Party Mode — virtual entry */}
+            <div
+              key="party-mode"
+              className="chat-agent-card chat-agent-card-special"
+              onClick={() => navigate('/collaboration')}
+            >
+              <div className="chat-agent-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444, #8b5cf6)' }}>🎊</div>
+              <div className="chat-agent-info">
+                <h4>Party Mode</h4>
+                <p>Invoquer tous les agents simultanément en mode collaboratif</p>
+              </div>
+            </div>
+
+            {/* Meta-agents first, then specialists */}
+            {[...agents].sort((a, b) => {
+              const order = { 'bmad-orchestrator': 1, 'bmad-master': 2 };
+              return (order[a.name] || 99) - (order[b.name] || 99);
+            }).map(agent => (
               <div
                 key={agent.name}
-                className="chat-agent-card"
+                className={`chat-agent-card${agent.name === 'bmad-orchestrator' || agent.name === 'bmad-master' ? ' chat-agent-card-meta' : ''}`}
                 onClick={() => handleStartChat(agent.name)}
               >
                 <div className="chat-agent-icon">{agent.icon || '🤖'}</div>

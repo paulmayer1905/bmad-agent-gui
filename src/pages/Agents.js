@@ -59,7 +59,10 @@ export default function Agents() {
           </div>
         ) : (
           <div className="grid-3">
-            {filtered.map(agent => (
+            {[...filtered].sort((a, b) => {
+              const order = { 'bmad-orchestrator': 1, 'bmad-master': 2 };
+              return (order[a.name] || 99) - (order[b.name] || 99);
+            }).map(agent => (
               <div
                 key={agent.name}
                 className="card card-clickable"

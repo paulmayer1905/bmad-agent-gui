@@ -1191,6 +1191,25 @@ tbody tr:last-child td {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
+/* Party Mode special card */
+.chat-agent-card-special {
+  border: 1px dashed var(--accent-purple);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(139, 92, 246, 0.08));
+}
+.chat-agent-card-special:hover {
+  border-style: solid;
+  border-color: #f59e0b;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.25);
+}
+
+/* Meta-agent cards (orchestrator, master) */
+.chat-agent-card-meta {
+  border-left: 3px solid var(--accent-purple);
+}
+.chat-agent-card-meta:hover {
+  border-left-color: #8b5cf6;
+}
+
 .chat-agent-icon {
   font-size: 36px;
   width: 56px;

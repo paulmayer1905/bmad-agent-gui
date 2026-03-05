@@ -19,6 +19,10 @@ const COMMANDS = [
   { id: 'sessions',      label: 'Gérer les sessions',           icon: '🔄', action: '/sessions', type: 'nav' },
   { id: 'queue',         label: "File d'attente",               icon: '📨', action: '/queue', type: 'nav' },
   { id: 'config',        label: 'Configuration',                icon: '⚙️', action: '/config', type: 'nav' },
+  // ─── Agents rapides ─────────────────────────────────────────────────
+  { id: 'party-mode',    label: 'Party Mode — Tous les agents',  icon: '🎊', action: '/collaboration', type: 'nav' },
+  { id: 'orchestrator',  label: 'Orchestrateur — Coordination',  icon: '🎭', action: '/chat/bmad-orchestrator', type: 'nav' },
+  { id: 'master',        label: 'Master — Expert universel',     icon: '🧙', action: '/chat/bmad-master', type: 'nav' },
 ];
 
 export default function CommandPalette({ isOpen, onClose }) {
