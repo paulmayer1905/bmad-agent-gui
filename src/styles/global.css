@@ -2908,6 +2908,7 @@ tbody tr:last-child td {
 
 .pviz-step-waiting  { border-color: var(--border-light); opacity: 0.6; }
 .pviz-step-running  { border-color: var(--accent-blue);  animation: pvizSpin 1.2s linear infinite; }
+.pviz-step-reviewing { border-color: var(--accent-yellow, #f0a500); background: rgba(240, 165, 0, 0.10); }
 .pviz-step-done     { border-color: var(--accent-green); }
 .pviz-step-error    { border-color: var(--accent-red); }
 
@@ -2916,6 +2917,66 @@ tbody tr:last-child td {
   height: 2px;
   background: var(--border-light);
   flex-shrink: 0;
+}
+
+/* Peer review indicator styles */
+.pviz-marker-reviewing  { border-color: var(--accent-yellow, #f0a500); background: rgba(240, 165, 0, 0.12); box-shadow: 0 0 12px rgba(240, 165, 0, 0.3); }
+.pviz-marker-completed  { border-color: var(--accent-green); background: rgba(16, 185, 129, 0.12); }
+.pviz-badge-reviewing   { background: rgba(240, 165, 0, 0.15); color: var(--accent-yellow, #f0a500); }
+.pviz-badge-completed   { background: rgba(16, 185, 129, 0.15); color: var(--accent-green-light); }
+
+.pviz-review-badge {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+  background: rgba(240, 165, 0, 0.15);
+  color: var(--accent-yellow, #f0a500);
+  margin-left: 4px;
+}
+
+.pviz-review-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--accent-yellow, #f0a500);
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: rgba(240, 165, 0, 0.06);
+  border-left: 3px solid var(--accent-yellow, #f0a500);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.pviz-review-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.pviz-review-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.pviz-review-round {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.pviz-review-critique {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border-left: 3px solid var(--accent-yellow, #f0a500);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 6px 10px;
+  margin-top: 4px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  opacity: 0.85;
 }
 
 /* ─── Markdown Viewer / Editor ──────────────────────────────────────────── */

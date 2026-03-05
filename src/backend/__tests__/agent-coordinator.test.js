@@ -915,5 +915,99 @@ describe('AgentCoordinator', () => {
 
       expect(stepDoneEvents[0].reviewRounds).toBe(0);
     });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('revision prompt includes the current deliverable text', async () => {
+      const prompts = [];
+      jest.spyOn(coordinator, 'delegateToAgent').mockImplementation(
+        async (from, agent, prompt, opts) => {
+          prompts.push({ agent, prompt });
+          // Round 1: reviewer critiques, Round 1: primary revises, Round 2: reviewer validates
+          if (prompts.length === 1) return { agentName: agent, agentTitle: agent, agentIcon: '🤖', question: prompt, response: 'Needs more detail on auth module.', usage: { inputTokens: 10, outputTokens: 10 }};
+          if (prompts.length === 2) return { agentName: agent, agentTitle: agent, agentIcon: '🤖', question: prompt, response: 'Revised spec with auth.', usage: { inputTokens: 10, outputTokens: 10 }};
+          return { agentName: agent, agentTitle: agent, agentIcon: '🤖', question: prompt, response: 'VALIDÉ: Complete', usage: { inputTokens: 10, outputTokens: 10 }};
+        }
+      );
+
+      await coordinator._runPeerReview({
+        step: makeStep({ maxRounds: 2 }),
+        primaryResult: makePrimaryResult('Initial architecture document with modules A, B, C.'),
+        state: makeState(),
+        pipelineId: 'pipe-prompt',
+        stepIndex: 0
+      });
+
+      // The revision prompt (2nd call) must include the original deliverable
+      expect(prompts[1].prompt).toContain('--- TON LIVRABLE ACTUEL ---');
+      expect(prompts[1].prompt).toContain('Initial architecture document with modules A, B, C.');
+      // And the critique
+      expect(prompts[1].prompt).toContain('Needs more detail on auth module.');
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('reviewRounds counts actual review rounds, not array entries', async () => {
+      // 2 rounds: challenge R1 → revision R1 → challenge R2 (VALIDÉ)
+      // That's 3 array entries but 2 actual review rounds
+      mockDelegateSequence(coordinator, [
+        'Critique round 1.',
+        'Revised output.',
+        'VALIDÉ: good now'
+      ]);
+
+      const result = await coordinator._runPeerReview({
+        step: makeStep({ maxRounds: 2 }),
+        primaryResult: makePrimaryResult(),
+        state: makeState(),
+        pipelineId: 'pipe-count',
+        stepIndex: 0
+      });
+
+      // Array has 3 entries (challenge, revision, challenge)
+      expect(result.peerReviewRounds).toHaveLength(3);
+      // But actual review rounds = challenges = 2
+      const roundCount = result.peerReviewRounds.filter(r => r.type === 'challenge').length;
+      expect(roundCount).toBe(2);
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('pipeline with peerReview defers artifact save to post-review', async () => {
+      const callResponses = ['Primary output', 'VALIDÉ: approved'];
+      let callIdx = 0;
+      const delegateSpy = jest.spyOn(coordinator, 'delegateToAgent').mockImplementation(
+        async (from, agent, prompt, opts) => {
+          const response = callResponses[callIdx++] ?? 'fallback';
+          // Track if saveAsArtifact was passed
+          return {
+            agentName: agent, agentTitle: agent, agentIcon: '🤖',
+            question: prompt, response,
+            usage: { inputTokens: 10, outputTokens: 10 },
+            _opts: opts // expose for assertion
+          };
+        }
+      );
+
+      await coordinator.executePipeline({
+        name: 'Deferred save test',
+        steps: [{
+          agent: 'pm',
+          task: 'Write spec',
+          saveArtifact: true,
+          artifactType: 'functional-spec',
+          peerReview: { reviewer: 'analyst', maxRounds: 1 }
+        }]
+      });
+
+      // First call (primary agent) should NOT save artifact (deferred to post-review)
+      expect(delegateSpy.mock.calls[0][3]).toMatchObject({ saveAsArtifact: false });
+      // Second call (reviewer) should NOT save artifact
+      expect(delegateSpy.mock.calls[1][3]).toMatchObject({ saveAsArtifact: false });
+      // Post-review save happens via projectContext.addArtifact
+      expect(mockProjectContext.addArtifact).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'functional-spec',
+          tags: expect.arrayContaining(['peer-reviewed', 'pm', 'analyst'])
+        })
+      );
+    });
   });
 });

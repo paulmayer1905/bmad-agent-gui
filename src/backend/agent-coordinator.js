@@ -854,23 +854,25 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
           const contextSummary = this.projectContext.buildContextForAgent(step.agent);
           const stepPrompt = this._buildStepPrompt(step, previousOutput, contextSummary, state.results);
 
-          // Delegate to the agent
+          // Delegate to the agent (defer artifact save when peer review will handle it)
+          const hasPeerReview = !!(step.peerReview && step.peerReview.reviewer);
           const result = await this.delegateToAgent(null, step.agent, stepPrompt, {
-            saveAsArtifact: step.saveArtifact !== false,
+            saveAsArtifact: step.saveArtifact !== false && !hasPeerReview,
             artifactType: step.artifactType || 'document'
           });
 
           // ── Peer review (bidirectional challenge/revision) ──────────
           let finalResult = result;
-          if (step.peerReview && step.peerReview.reviewer) {
+          if (hasPeerReview) {
             finalResult = await this._runPeerReview({
               step, primaryResult: result, state, pipelineId, stepIndex: i
             });
-            // Persist the final revised version as artifact
-            if (step.saveArtifact !== false && finalResult !== result) {
+            // Persist the peer-reviewed version (initial save was deferred)
+            if (step.saveArtifact !== false) {
+              const wasRevised = finalResult.peerReviewRounds?.some(r => r.type === 'revision');
               await this.projectContext.addArtifact({
                 type: step.artifactType || 'document',
-                title: `[Révisé] ${step.task || step.agent}`,
+                title: `${wasRevised ? '[Révisé] ' : '[Validé] '}${step.task || step.agent}`,
                 content: finalResult.response,
                 summary: finalResult.response.slice(0, 200),
                 agent: step.agent,
@@ -906,7 +908,7 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
             response: finalResult.response.slice(0, 300),
             usage: finalResult.usage,
             filesWritten: filesWritten.length,
-            reviewRounds: finalResult.peerReviewRounds?.length || 0
+            reviewRounds: finalResult.peerReviewRounds?.filter(r => r.type === 'challenge').length || 0
           });
 
         } catch (err) {
@@ -983,10 +985,10 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
 
     for (let round = 1; round <= maxRounds; round++) {
       // ── Reviewer challenges ──────────────────────────────────────────
-      const focusHint = focus ? `\nFocalise-toi particulièrement sur : ${focus}` : '';
+      const focusHint = focus ? `Focalise-toi particulièrement sur : ${focus}` : '';
       const reviewPrompt = [
         `Tu es ${reviewerTitle} et tu examines le livrable produit par ${primaryTitle}.`,
-        focusHint,
+        ...(focusHint ? [focusHint] : []),
         '',
         '--- LIVRABLE À RÉVISER ---',
         currentResult.response,
@@ -1034,11 +1036,15 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
         const revisionPrompt = [
           `${reviewerTitle} a examiné ton livrable et a des remarques.`,
           '',
+          '--- TON LIVRABLE ACTUEL ---',
+          currentResult.response,
+          '--- FIN DU LIVRABLE ---',
+          '',
           '--- CRITIQUE ---',
           critique,
           '--- FIN DE LA CRITIQUE ---',
           '',
-          'Revois ton livrable précédent en tenant compte de ces points.',
+          'Revois ce livrable en tenant compte des critiques ci-dessus.',
           'Produis une version améliorée et COMPLÈTE (pas juste les corrections — l\'intégralité du document).',
           `Instructions originales rappelées : ${step.task}`
         ].join('\n');
@@ -1060,8 +1066,7 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
           ...revisedResult,
           // Keep original metadata for pipeline bookkeeping
           agentIcon: primaryResult.agentIcon,
-          agentTitle: primaryResult.agentTitle,
-          peerReviewRounds: rounds
+          agentTitle: primaryResult.agentTitle
         };
       } else {
         // Exhausted rounds — keep last revision
