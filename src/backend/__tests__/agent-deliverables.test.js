@@ -353,6 +353,399 @@ Le projet est en bonne voie pour la livraison du MVP en Sprint 2.
 3. Kick-off Sprint 1 (mardi)
 `,
 
+  market_study: `
+## 1. Contexte et périmètre de l'étude
+Marché adressé : applications de gestion de tâches B2B/B2C.
+Zone géographique : France + Europe francophone.
+Date de l'étude : 2024-Q1.
+
+## 2. Analyse de l'existant — Solutions concurrentes
+
+### 🏢 Trello
+| Critère | Détail |
+|---------|--------|
+| **Type** | SaaS |
+| **Positionnement** | Kanban visuel simple |
+| **Cible** | PME, équipes agiles |
+| **Prix** | Freemium, Pro 10€/mois |
+| **Forces** | Interface intuitive, intégrations nombreuses |
+| **Faiblesses** | Pas de Gantt natif, limites plan gratuit |
+| **Part de marché** | ~15% sur le segment PME |
+
+### 🏢 Asana
+| Critère | Détail |
+|---------|--------|
+| **Type** | SaaS |
+| **Positionnement** | Gestion de projets complète |
+| **Cible** | Équipes 10-500 |
+| **Prix** | Freemium, Premium 11€/utilisateur/mois |
+| **Forces** | Vues multiples, automatisations |
+| **Faiblesses** | Courbe d'apprentissage, prix élevé |
+| **Part de marché** | ~20% segment mid-market |
+
+### 🏢 Notion (concurrent indirect)
+| Critère | Détail |
+|---------|--------|
+| **Type** | SaaS |
+| **Positionnement** | All-in-one workspace |
+| **Cible** | Startups, freelances |
+| **Prix** | Freemium, Team 8€/utilisateur/mois |
+| **Forces** | Flexibilité extrême, wiki intégré |
+| **Faiblesses** | Pas de gestion de projet dédiée, lent |
+| **Part de marché** | ~10% segment knowledge workers |
+
+## 3. Points de douleur des utilisateurs
+
+### 🔴 Douleurs critiques (bloquants)
+- Synchronisation temps réel défaillante — *L'équipe voit des versions différentes d'une même tâche*
+- Pas de vue unifiée multi-projets — *Impossible de voir la charge globale d'un développeur*
+
+### 🟡 Douleurs majeures (friction importante)
+- Dépendances entre tâches mal gérées — *Les retards en cascade ne se propagent pas automatiquement*
+- Notifications trop nombreuses — *60% des utilisateurs désactivent toutes les notifications*
+
+### 🟢 Douleurs mineures (irritants)
+- Pas de mode hors-ligne — *Frustrant en déplacements*
+
+## 4. Analyse comparative — Tableau de positionnement
+
+| Fonctionnalité clé | Notre produit | Trello | Asana | Notion |
+|-------------------|:---:|:---:|:---:|:---:|
+| Vue Kanban | ✅ | ✅ | ✅ | ⚠️ |
+| Vue Gantt | ✅ | ❌ | ✅ | ❌ |
+| Mode hors-ligne | 🔄 Prévu | ❌ | ❌ | ❌ |
+| IA intégrée | ✅ | ❌ | 🔄 | ⚠️ |
+
+## 5. Opportunités de différenciation
+1. **IA pour la priorisation automatique** — Aucun concurrent ne propose de priorisation basée sur l'impact métier
+2. **Mode hors-ligne complet** — Gap identifié chez les 3 grands acteurs
+3. **Vue charge équipe temps réel** — Pain point critique non résolu
+
+## 6. Sizing du marché (TAM / SAM / SOM)
+
+| Segment | Taille estimée | Méthode d'estimation |
+|---------|---------------|---------------------|
+| **TAM** | 8 M utilisateurs / 960 M€ | 20€/an × population cible UE |
+| **SAM** | 2 M utilisateurs | Filtrage France + francophonie |
+| **SOM** | 50 000 utilisateurs (2.5%) | Part réaliste Y1-Y3 |
+
+## 7. Tendances du marché
+- IA générative intégrée dans les outils de productivité (trend fort)
+- Consolidation marché (Microsoft/Google absorbent les acteurs)
+- Réglementation RGPD pousse vers solutions hébergées en Europe
+
+## 8. Recommandation stratégique de positionnement
+- **Proposition de valeur unique :** "Le seul outil de gestion de tâches qui priorise automatiquement grâce à l'IA"
+- Segment prioritaire Y1 : équipes tech 10-50 personnes
+- Go-to-market : Product Hunt + DevCommunities + essai gratuit 30 jours
+`,
+
+  functional_spec: `
+## 1. Objet et périmètre du document
+Version 1.0 — 2024-Q1 — Auteur : Agent PM
+L'application Task Manager permet à des équipes de créer, assigner et suivre des tâches de manière collaborative.
+Périmètre couvert : gestion des tâches, authentification, notifications.
+Périmètre exclu : intégrations tierces (Jira, Slack) — Phase 2.
+
+## 2. Glossaire
+| Terme | Définition |
+|-------|------------|
+| Tâche | Unité de travail assignable avec titre, description, statut, priorité |
+| Épic | Regroupement de tâches liées à une même fonctionnalité |
+| Sprint | Période de travail de 2 semaines |
+| DoD | Definition of Done — critères de complétion d'une tâche |
+
+## 3. Acteurs et rôles
+| Acteur | Description | Droits / Permissions | Conditions d'accès |
+|--------|-------------|---------------------|-------------------|
+| Chef de projet | Gère l'équipe et les sprints | CRUD toutes tâches, gestion membres | Authentifié + rôle manager |
+| Développeur | Réalise les tâches assignées | Lecture toutes, écriture ses tâches | Authentifié |
+| Invité | Consultation uniquement | Lecture seule | Authentifié + invitation |
+
+## 4. Cas d'utilisation (Use Cases)
+
+---
+### UC-1 : Créer une tâche
+**Acteur principal :** Chef de projet
+**Objectif :** Créer une nouvelle tâche dans le backlog
+**Préconditions :** Utilisateur authentifié avec rôle manager
+**Postconditions :** Tâche créée avec ID unique, visible dans le backlog
+
+**Scénario nominal (chemin heureux) :**
+1. L'utilisateur clique sur "Nouvelle tâche"
+2. Le système affiche le formulaire de création
+3. L'utilisateur saisit titre, description, assigné, priorité
+4. L'utilisateur soumet le formulaire
+5. Le système valide les données (RG-001)
+6. Le système persiste la tâche et retourne l'ID généré
+7. Le système affiche la tâche dans le backlog
+
+**Scénarios alternatifs :**
+- **Alt-1a** : Assignation à plusieurs membres → Le système accepte une liste d'assignés
+
+**Scénarios d'exception :**
+- **Exc-1a** : Titre manquant → Le système affiche "Le titre est obligatoire" (RG-001)
+
+**Règles de gestion associées :** RG-001, RG-002
+---
+
+---
+### UC-2 : Consulter mes tâches
+**Acteur principal :** Développeur
+**Objectif :** Voir la liste de ses tâches assignées
+**Préconditions :** Utilisateur authentifié
+**Postconditions :** Liste filtrée affichée
+
+**Scénario nominal :**
+1. L'utilisateur accède au Dashboard
+2. Le système retourne les tâches filtrées par userId
+3. Les tâches sont triées par priorité décroissante
+
+**Règles de gestion associées :** RG-003
+---
+
+## 5. Règles de gestion (RG)
+| ID | Règle | Priorité | UC liés |
+|----|-------|----------|---------|
+| RG-001 | Le titre d'une tâche est obligatoire, 3-200 caractères | Obligatoire | UC-1 |
+| RG-002 | La priorité doit être l'une de : Critique, Haute, Normale, Basse | Obligatoire | UC-1 |
+| RG-003 | Un développeur ne voit que les tâches qui lui sont assignées | Obligatoire | UC-2 |
+| RG-004 | Une tâche complétée ne peut pas être réouverte sans rôle manager | Optionnel | UC-1, UC-2 |
+
+## 6. Exigences d'interface utilisateur
+- Accessibilité : WCAG 2.1 AA (contraste 4.5:1 minimum)
+- Responsive : Desktop, Tablette, Mobile (375px+)
+- Messages d'erreur : en français, non techniques
+
+## 7. Exigences de données
+- Titre : requis, 3-200 chars, UTF-8
+- Description : optionnel, max 5000 chars, Markdown autorisé
+- RGPD : les données personnelles (email, nom) sont chiffrées en base
+
+## 8. Matrice de traçabilité
+| ID Exigence | Description | US liées | Priorité |
+|-------------|-------------|----------|---------|
+| EF-001 | Création de tâche | US-1.1 | Must-Have |
+| EF-002 | Consultation des tâches | US-1.2 | Must-Have |
+| EF-003 | Authentification | US-2.1 | Must-Have |
+`,
+
+  technical_spec: `
+## 1. Objet et périmètre
+Version 1.0 — 2024-Q1 — Auteur : Agent Architecte
+Stack technique : Node.js 20 + Express 4 (API), React 18 (Frontend), PostgreSQL 16 (DB), Redis 7 (cache sessions).
+Justifications : Node.js pour l'I/O non-bloquant, PostgreSQL pour les relations complexes, React pour l'écosystème riche.
+
+## 2. Architecture détaillée
+
+### 2.1 Diagramme d'architecture
+\`\`\`
+[Browser/React] ──HTTPS──▶ [Nginx reverse proxy]
+                                ├──▶ [API Express :3001]──▶ [PostgreSQL :5432]
+                                │                         ──▶ [Redis :6379]
+                                └──▶ [Static files]
+\`\`\`
+
+### 2.2 Composants techniques
+| Composant | Technologie | Rôle | Dépendances |
+|-----------|-------------|------|-------------|
+| API Gateway | Express 4 + Helmet | Routing, auth middleware | Node.js 20 |
+| Task Service | service/tasks.js | CRUD tâches | Sequelize, PostgreSQL |
+| Auth Service | service/auth.js | JWT, sessions | Redis, bcrypt |
+| Frontend | React 18 + Vite | Interface utilisateur | API REST |
+
+## 3. API — Contrats d'interface
+
+---
+### POST /api/tasks
+**Description :** Créer une nouvelle tâche
+**Authentification :** Bearer JWT
+
+**Corps de la requête (JSON) :**
+\`\`\`json
+{
+  "title": "string — requis, 3-200 chars",
+  "description": "string — optionnel, max 5000 chars",
+  "assignedTo": "uuid — optionnel",
+  "priority": "Critique|Haute|Normale|Basse"
+}
+\`\`\`
+
+**Réponse succès (201) :**
+\`\`\`json
+{
+  "id": "uuid",
+  "title": "string",
+  "status": "todo",
+  "createdAt": "ISO8601"
+}
+\`\`\`
+
+**Codes d'erreur :**
+| Code | Signification | Cause |
+|------|---------------|-------|
+| 400 | Bad Request | Titre manquant ou invalide |
+| 401 | Unauthorized | Token absent ou expiré |
+---
+
+## 4. Modèle de données (Schéma)
+
+### Entité : Task
+\`\`\`
+Table: tasks
+├── id          UUID        PK, NOT NULL, DEFAULT gen_random_uuid()
+├── title       VARCHAR(200) NOT NULL
+├── description TEXT
+├── status      VARCHAR(20)  NOT NULL DEFAULT 'todo'
+├── priority    VARCHAR(20)  NOT NULL DEFAULT 'Normale'
+├── assigned_to UUID        FK → users.id
+├── created_at  TIMESTAMP   NOT NULL, DEFAULT NOW()
+└── updated_at  TIMESTAMP   NOT NULL
+\`\`\`
+
+**Relations :**
+- Task N──1 User (assigné)
+
+**Index :**
+- idx_tasks_assigned_to sur assigned_to (requêtes fréquentes par développeur)
+- idx_tasks_status sur status (filtrage par statut)
+
+## 5. Sécurité
+
+| Vecteur d'attaque | Mesure de protection | Implémentation |
+|-------------------|---------------------|----------------|
+| Injection SQL | ORM paramétré | Sequelize avec bindings |
+| XSS | Échappement + CSP | DOMPurify + helmet CSP |
+| CSRF | SameSite=Strict Cookie | Express sessions |
+| Auth | JWT + refresh token | expiration 15min + rotation |
+| Rate limiting | 100 req/min par IP | express-rate-limit |
+
+## 6. Exigences non-fonctionnelles (ENF)
+
+| ID | Catégorie | Exigence | Seuil mesurable |
+|----|-----------|----------|-----------------|
+| ENF-001 | Performance | Temps de réponse API | p95 < 200ms |
+| ENF-002 | Disponibilité | Uptime | 99.9% / mois |
+| ENF-003 | Scalabilité | Utilisateurs simultanés | 1000 sans dégradation |
+| ENF-004 | Sécurité | Chiffrement données transit | TLS 1.3 minimum |
+
+## 7. Infrastructure et déploiement
+
+### Environnements
+| Env | URL | Usage | Configuration |
+|-----|-----|-------|---------------|
+| dev | localhost:3000 | Développement local | Docker Compose |
+| staging | staging.taskmanager.io | Tests d'intégration | Cloud (same config) |
+| prod | taskmanager.io | Production | Cloud HA, 2 instances |
+
+### Pipeline CI/CD
+\`\`\`
+Push Git → ESLint + Tests Jest → Build Docker → Deploy Staging → Tests Playwright → Deploy Prod
+\`\`\`
+
+## 8. Plan de tests techniques
+
+| Type de test | Outil | Couverture cible | Responsable |
+|-------------|-------|-----------------|-------------|
+| Unitaires | Jest | 80% | Dev |
+| Intégration | Supertest | Tous les endpoints | QA |
+| E2E | Playwright | Flux critiques UC-1, UC-2 | QA |
+| Performance | k6 | ENF-001 à ENF-003 | DevOps |
+| Sécurité | OWASP ZAP | OWASP Top 10 | Architect |
+`,
+
+  roadmap: `
+## 1. Vision et objectifs stratégiques
+
+### Étoile du Nord (North Star Metric)
+- **Métrique principale :** Tâches actives créées par semaine (Weekly Active Tasks)
+- **Cible Y1 :** 10 000 tâches/semaine (500 équipes de 5 personnes × 4 tâches/semaine)
+
+### Objectifs par horizon
+| Horizon | Période | Objectif principal | Critère de succès |
+|---------|---------|-------------------|------------------|
+| Court terme | M1 – M3 | MVP live | 50 équipes beta, NPS > 30 |
+| Moyen terme | M4 – M9 | Croissance | 500 équipes actives, MRR 5k€ |
+| Long terme | M10 – M18 | Scalabilité | 2000 équipes, ARR 100k€ |
+
+## 2. Roadmap par phase (Timeline)
+
+### 🏗️ Phase 1 — MVP (Mois 1-3)
+**Thème :** Livrer la valeur core — créer et suivre des tâches
+**Objectif :** Valider le product-market fit avec 50 early adopters
+
+| Semaine | Epic / Feature | Priorité | Owner | Effort |
+|---------|---------------|----------|-------|--------|
+| S1-S2 | Infrastructure Docker + CI/CD | Critique | Tech Lead | L |
+| S3-S4 | API CRUD Tâches | Critique | Dev | XL |
+| S5-S6 | Authentification JWT | Critique | Dev | M |
+| S7-S8 | Dashboard React | Haute | Dev | M |
+| S9-S10 | Tests & QA | Critique | QA | M |
+| S11-S12 | Beta launch + feedback loop | Critique | PM | S |
+
+**Jalons (Milestones) :**
+- 📍 **M1** : Infrastructure en place, CI/CD opérationnel
+- 📍 **M2** : MVP fonctionnel en staging
+- 📍 **M3** : MVP livré, 50 équipes beta onboardées
+
+### 🚀 Phase 2 — Croissance (Mois 4-9)
+**Thème :** Rétention et acquisition basées sur la différenciation IA
+
+| Trimestre | Epic / Feature | Priorité | Dépendance |
+|-----------|--------------|----------|------------|
+| Q2 | IA : priorisation automatique | Haute | MVP |
+| Q2 | Vue Gantt | Haute | MVP |
+| Q3 | Système de notifications | Moyenne | Q2 |
+| Q3 | Tier Premium / Monétisation | Haute | PMF validé |
+
+**Jalons :**
+- 📍 **M6** : 500 équipes actives, NPS > 40
+- 📍 **M9** : MRR 5k€, churn < 5%
+
+### 🌍 Phase 3 — Scale (Mois 10-18)
+**Thème :** Expansion et consolidation
+
+| Période | Initiative | Impact attendu |
+|---------|-----------|---------------|
+| M10-M12 | API publique + intégrations | Effets de réseau, +30% acquisition |
+| M13-M15 | Mobile (iOS + Android) | +40% DAU |
+| M16-M18 | Enterprise tier + SSO | ACV multiplié par 8 |
+
+**Jalons :**
+- 📍 **M12** : API publique documentée
+- 📍 **M18** : 2000 équipes actives, ARR 100k€
+
+## 3. Dépendances critiques et risques de la roadmap
+
+| Risque | Phase impactée | Probabilité | Impact | Mitigation |
+|--------|--------------|:-----------:|:------:|-----------|
+| Retard tech majeur | Phase 1 | Moyenne | Critique | Scope MVP réduit à 60% |
+| Adoption insuffisante | Phase 2 | Faible | Haute | Pivot feature si NPS < 20 |
+| Concurrent qui copie l'IA | Phase 2-3 | Haute | Haute | Brevets + avance d'exécution |
+
+## 4. Backlog stratégique (Post-Phase 3)
+- Mode hors-ligne complet — Valeur estimée : Haute | Effort : XL
+- Internationalisation EN/DE — Valeur estimée : Haute | Effort : M
+- Marketplace d'intégrations — Valeur estimée : Très haute | Effort : XXL
+
+## 5. Métriques de suivi par phase
+
+| Phase | KPI | Outil de mesure | Fréquence revue |
+|-------|-----|----------------|-----------------|
+| Phase 1 | Bugs critiques en prod | Sentry | Quotidien |
+| Phase 1-2 | DAU / WAU / MAU | Mixpanel | Hebdo |
+| Phase 2 | MRR, Churn rate | Stripe | Mensuel |
+| Phase 3 | NPS, CSAT | Typeform | Trimestriel |
+
+## 6. Go-to-Market par phase
+
+| Phase | Canal principal | Action | Budget estimé |
+|-------|----------------|--------|---------------|
+| Phase 1 | Community (Reddit, Dev.to) | Lancement Product Hunt | 0€ |
+| Phase 2 | SEO + Content | Blog + Docs publics | 500€/mois |
+| Phase 3 | Paid acquisition + Partnerships | Google Ads + Intégrations | 5k€/mois |
+`,
+
   orchestrateur: `
 ## Plan d'orchestration
 
@@ -475,6 +868,76 @@ const VALIDATORS = {
     /[Cc]onsoli/,
     /[Ss]ortie|[Oo]utput/,
     /[Ll]ivrable|[Dd]ossier/
+  ],
+  market_study: [
+    '## 1. Contexte et périmètre',
+    '## 2. Analyse de l\'existant',
+    /🏢 .+/,
+    /\*\*Type\*\*/,
+    /\*\*Forces\*\*/,
+    /\*\*Faiblesses\*\*/,
+    '## 3. Points de douleur',
+    '🔴 Douleurs critiques',
+    '🟡 Douleurs majeures',
+    '## 4. Analyse comparative',
+    /\| .+ \| ✅|❌|⚠️|🔄/,
+    '## 5. Opportunités de différenciation',
+    '## 6. Sizing du marché',
+    /TAM|SAM|SOM/,
+    '## 7. Tendances du marché',
+    '## 8. Recommandation stratégique'
+  ],
+  functional_spec: [
+    '## 1. Objet et périmètre',
+    '## 2. Glossaire',
+    /\| .+ \| Définition/,
+    '## 3. Acteurs et rôles',
+    /\| Acteur \|/,
+    '## 4. Cas d\'utilisation',
+    /### UC-\d+/,
+    '**Acteur principal :**',
+    'Scénario nominal',
+    /RG-\d{3}/,
+    '## 5. Règles de gestion',
+    '## 6. Exigences d\'interface utilisateur',
+    '## 7. Exigences de données',
+    '## 8. Matrice de traçabilité',
+    /EF-\d{3}/
+  ],
+  technical_spec: [
+    '## 1. Objet et périmètre',
+    '## 2. Architecture détaillée',
+    /2\.1 Diagramme/,
+    '## 3. API',
+    /### (GET|POST|PUT|PATCH|DELETE) \//,
+    /```json/,
+    /Codes d\'erreur/,
+    '## 4. Modèle de données',
+    /Table:/,
+    '## 5. Sécurité',
+    /Injection SQL|XSS|CSRF|Rate limit/,
+    '## 6. Exigences non-fonctionnelles',
+    /ENF-\d{3}/,
+    /p95|uptime|Uptime/i,
+    '## 7. Infrastructure et déploiement',
+    '## 8. Plan de tests techniques',
+    /Jest|Playwright|Cypress|k6/
+  ],
+  roadmap: [
+    '## 1. Vision et objectifs',
+    /[Éé]toile du Nord|North Star/,
+    /TAM|SAM|SOM|Cible Y\d/,
+    '## 2. Roadmap par phase',
+    /Phase 1|MVP/,
+    /Phase 2|[Cc]roissance/,
+    /Phase 3|Scale/,
+    /📍 \*\*M\d+\*\*/,
+    '## 3. Dépendances critiques et risques',
+    /Probabilité|[Mm]itigation/,
+    '## 4. Backlog stratégique',
+    '## 5. Métriques de suivi',
+    /KPI|DAU|MAU|MRR/,
+    '## 6. Go-to-Market'
   ]
 };
 
@@ -551,6 +1014,45 @@ describe('Agent instruction templates — intégrité', () => {
     expect(src).toContain('retours du QA');
     expect(src).toContain('Corrige TOUS les bugs');
     expect(src).toContain('rapport final de couverture');
+  });
+
+  test('MARKET_STUDY_INSTRUCTIONS contient les sections obligatoires', () => {
+    expect(src).toContain('Contexte et périmètre de l\'étude');
+    expect(src).toContain('Analyse de l\'existant');
+    expect(src).toContain('Points de douleur des utilisateurs');
+    expect(src).toContain('TAM');
+    expect(src).toContain('SAM');
+    expect(src).toContain('SOM');
+    expect(src).toContain('Recommandation stratégique de positionnement');
+  });
+
+  test('FUNCTIONAL_SPEC_INSTRUCTIONS contient les sections obligatoires', () => {
+    expect(src).toContain('Spécifications Fonctionnelles Détaillées');
+    expect(src).toContain('Cas d\'utilisation');
+    expect(src).toContain('Acteur principal');
+    expect(src).toContain('Scénario nominal');
+    expect(src).toContain('Règles de gestion');
+    expect(src).toContain('Matrice de traçabilité');
+  });
+
+  test('TECHNICAL_SPEC_INSTRUCTIONS contient les sections obligatoires', () => {
+    expect(src).toContain('Spécifications Techniques Détaillées');
+    expect(src).toContain('Architecture détaillée');
+    expect(src).toContain('Contrats d\'interface');
+    expect(src).toContain('Modèle de données');
+    expect(src).toContain('Exigences non-fonctionnelles');
+    expect(src).toContain('Infrastructure et déploiement');
+    expect(src).toContain('Plan de tests techniques');
+  });
+
+  test('ROADMAP_INSTRUCTIONS contient les sections obligatoires', () => {
+    expect(src).toContain('North Star Metric');
+    expect(src).toContain('Roadmap par phase');
+    expect(src).toContain('Phase 1');
+    expect(src).toContain('Phase 2');
+    expect(src).toContain('Phase 3');
+    expect(src).toContain('Dépendances critiques et risques');
+    expect(src).toContain('Go-to-Market');
   });
 });
 
@@ -754,6 +1256,177 @@ describe('Validateur de livrables — agent Orchestrateur', () => {
   });
 });
 
+describe('Validateur de livrables — Étude de marché', () => {
+  test('livrable conforme passe la validation', () => {
+    const { passed, missing } = validateDeliverable(FIXTURE.market_study, VALIDATORS.market_study);
+    expect(missing).toEqual([]);
+    expect(passed).toBe(true);
+  });
+
+  test('livrable sans section concurrents est détecté', () => {
+    const noConcurrent = FIXTURE.market_study.replace(/### 🏢.+\n[\s\S]*?(?=### 🏢|## 3)/g, '');
+    const { passed } = validateDeliverable(noConcurrent, VALIDATORS.market_study);
+    expect(passed).toBe(false);
+  });
+
+  test('livrable sans TAM/SAM/SOM est détecté', () => {
+    const noSizing = FIXTURE.market_study
+      .replace(/TAM/g, '')
+      .replace(/SAM/g, '')
+      .replace(/SOM/g, '');
+    const { passed } = validateDeliverable(noSizing, VALIDATORS.market_study);
+    expect(passed).toBe(false);
+  });
+
+  test('livrable sans pain points est détecté', () => {
+    const noPain = FIXTURE.market_study.replace(/🔴 Douleurs critiques[\s\S]*?(?=🟡)/, '');
+    const { passed } = validateDeliverable(noPain, VALIDATORS.market_study);
+    expect(passed).toBe(false);
+  });
+});
+
+describe('Validateur de livrables — Spécifications fonctionnelles', () => {
+  test('livrable conforme passe la validation', () => {
+    const { passed, missing } = validateDeliverable(FIXTURE.functional_spec, VALIDATORS.functional_spec);
+    expect(missing).toEqual([]);
+    expect(passed).toBe(true);
+  });
+
+  test('livrable sans use cases est détecté', () => {
+    const noUC = FIXTURE.functional_spec.replace(/### UC-\d[\s\S]*?(?=## 5)/, '');
+    const { passed } = validateDeliverable(noUC, VALIDATORS.functional_spec);
+    expect(passed).toBe(false);
+  });
+
+  test('livrable sans règles de gestion est détecté', () => {
+    const noRG = FIXTURE.functional_spec.replace(/RG-\d{3}/g, '');
+    const { passed } = validateDeliverable(noRG, VALIDATORS.functional_spec);
+    expect(passed).toBe(false);
+  });
+
+  test('livrable sans matrice de traçabilité est détecté', () => {
+    const noMatrix = FIXTURE.functional_spec.replace('## 8. Matrice de traçabilité', '');
+    const { passed } = validateDeliverable(noMatrix, VALIDATORS.functional_spec);
+    expect(passed).toBe(false);
+  });
+});
+
+describe('Validateur de livrables — Spécifications techniques', () => {
+  test('livrable conforme passe la validation', () => {
+    const { passed, missing } = validateDeliverable(FIXTURE.technical_spec, VALIDATORS.technical_spec);
+    expect(missing).toEqual([]);
+    expect(passed).toBe(true);
+  });
+
+  test('livrable sans modèle de données est détecté', () => {
+    const noModel = FIXTURE.technical_spec.replace(/## 4\. Modèle de données[\s\S]*?(?=## 5)/, '## 5');
+    const { passed } = validateDeliverable(noModel, VALIDATORS.technical_spec);
+    expect(passed).toBe(false);
+  });
+
+  test('livrable sans contrats API est détecté', () => {
+    const noApi = FIXTURE.technical_spec.replace(/### (GET|POST|PUT|PATCH|DELETE)[\s\S]*?---/g, '');
+    const { passed } = validateDeliverable(noApi, VALIDATORS.technical_spec);
+    expect(passed).toBe(false);
+  });
+
+  test('livrable sans exigences non-fonctionnelles est détecté', () => {
+    const noEnf = FIXTURE.technical_spec.replace(/ENF-\d{3}/g, '');
+    const { passed } = validateDeliverable(noEnf, VALIDATORS.technical_spec);
+    expect(passed).toBe(false);
+  });
+});
+
+describe('Validateur de livrables — Roadmap', () => {
+  test('livrable conforme passe la validation', () => {
+    const { passed, missing } = validateDeliverable(FIXTURE.roadmap, VALIDATORS.roadmap);
+    expect(missing).toEqual([]);
+    expect(passed).toBe(true);
+  });
+
+  test('livrable sans milestones Phase 1 est détecté', () => {
+    const noMilestone = FIXTURE.roadmap.replace(/📍 \*\*M\d+\*\*/g, '');
+    const { passed } = validateDeliverable(noMilestone, VALIDATORS.roadmap);
+    expect(passed).toBe(false);
+  });
+
+  test('livrable sans métriques est détecté', () => {
+    const noMetrics = FIXTURE.roadmap
+      .replace(/KPI/g, '')
+      .replace(/DAU/g, '')
+      .replace(/MAU/g, '')
+      .replace(/MRR/g, '');
+    const { passed } = validateDeliverable(noMetrics, VALIDATORS.roadmap);
+    expect(passed).toBe(false);
+  });
+
+  test('livrable sans section risques est détecté', () => {
+    const noRisk = FIXTURE.roadmap.replace('## 3. Dépendances critiques et risques', '');
+    const { passed } = validateDeliverable(noRisk, VALIDATORS.roadmap);
+    expect(passed).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// 2b. NEW PIPELINE TEMPLATES — structure tests
+// ─────────────────────────────────────────────────────────────────────────
+describe('getPipelineTemplates — nouveaux pipelines', () => {
+  let src;
+  beforeAll(() => { src = loadCoordinatorSource(); });
+
+  test('le pipeline market-study est déclaré', () => {
+    expect(src).toContain("id: 'market-study'");
+    expect(src).toContain("name: '🔍 Étude de marché'");
+  });
+
+  test('le pipeline market-study utilise MARKET_STUDY_INSTRUCTIONS', () => {
+    expect(src).toContain('MARKET_STUDY_INSTRUCTIONS');
+    // Pipeline step should reference the analyst agent
+    const marketSection = src.split("id: 'market-study'")[1].split('id:')[0];
+    expect(marketSection).toContain("agent: 'analyst'");
+  });
+
+  test('le pipeline full-specifications est déclaré', () => {
+    expect(src).toContain("id: 'full-specifications'");
+    expect(src).toContain("name: '📋 Spécifications complètes'");
+  });
+
+  test('le pipeline full-specifications contient 4 étapes', () => {
+    const afterId = src.split("id: 'full-specifications'")[1] || '';
+    // Normalize line endings then extract the pipeline steps section
+    const normalized = afterId.replace(/\r\n/g, '\n');
+    const endIdx = normalized.search(/\n\s{4}\];\s*\n\s{2}\}/);
+    const section = endIdx !== -1 ? normalized.slice(0, endIdx) : normalized.slice(0, 2000);
+    // count step agent declarations: agent: 'xxx'
+    const stepCount = (section.match(/agent: '[a-z-]+'/g) || []).length;
+    expect(stepCount).toBe(4);
+  });
+
+  test('le pipeline full-specifications inclut analyst, pm, architect', () => {
+    const section = src.split("id: 'full-specifications'")[1].split("\n      }\n    ]\n  }\n    ];")[0] || '';
+    expect(section).toContain("agent: 'analyst'");
+    expect(section).toContain("agent: 'pm'");
+    expect(section).toContain("agent: 'architect'");
+  });
+
+  test('le pipeline full-specifications référence les 4 nouvelles constantes', () => {
+    const section = src.split("id: 'full-specifications'")[1] || '';
+    expect(section).toContain('MARKET_STUDY_INSTRUCTIONS');
+    expect(section).toContain('FUNCTIONAL_SPEC_INSTRUCTIONS');
+    expect(section).toContain('TECHNICAL_SPEC_INSTRUCTIONS');
+    expect(section).toContain('ROADMAP_INSTRUCTIONS');
+  });
+
+  test('getPipelineTemplates retourne maintenant 7 pipelines', () => {
+    // 5 existing + market-study + full-specifications = 7
+    const pipelineIds = [...src.matchAll(/id: '([^']+)'/g)].map(m => m[1]).filter(id =>
+      ['analysis-to-architecture', 'full-product-design', 'story-to-implementation',
+       'full-app-development', 'code-review-pipeline', 'market-study', 'full-specifications'].includes(id)
+    );
+    expect(pipelineIds.length).toBe(7);
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // 3. PIPELINE USER STORY COVERAGE CHECK
 // ─────────────────────────────────────────────────────────────────────────
@@ -862,7 +1535,7 @@ describe('Qualité des livrables — seuils minimaux', () => {
 // 5. AGENT COORDINATOR — instruction constants registration
 // ─────────────────────────────────────────────────────────────────────────
 describe('AgentCoordinator — constantes d\'instructions exportées', () => {
-  test('le fichier définit les 8 constantes d\'instructions attendues', () => {
+  test('le fichier définit les 8 constantes d\'instructions legacy', () => {
     const src = loadCoordinatorSource();
     const expected = [
       'ANALYST_INSTRUCTIONS',
@@ -881,6 +1554,19 @@ describe('AgentCoordinator — constantes d\'instructions exportées', () => {
 
   test('le fichier définit FULL_APP_CODE_INSTRUCTIONS', () => {
     expect(loadCoordinatorSource()).toContain('FULL_APP_CODE_INSTRUCTIONS');
+  });
+
+  test('le fichier définit les 4 nouvelles constantes de livrables', () => {
+    const src = loadCoordinatorSource();
+    const newConstants = [
+      'MARKET_STUDY_INSTRUCTIONS',
+      'FUNCTIONAL_SPEC_INSTRUCTIONS',
+      'TECHNICAL_SPEC_INSTRUCTIONS',
+      'ROADMAP_INSTRUCTIONS'
+    ];
+    newConstants.forEach(name => {
+      expect(src).toContain(`const ${name}`);
+    });
   });
 
   test('la classe AgentCoordinator est exportée', () => {

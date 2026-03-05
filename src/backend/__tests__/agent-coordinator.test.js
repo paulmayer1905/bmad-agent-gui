@@ -323,21 +323,23 @@ describe('AgentCoordinator', () => {
       expect(coordinator.getPipelineStatus('unknown-id')).toBeNull();
     });
 
-    test('getPipelineTemplates should return 5 predefined templates', () => {
+    test('getPipelineTemplates should return 7 predefined templates', () => {
       const templates = coordinator.getPipelineTemplates();
 
-      expect(templates).toHaveLength(5);
+      expect(templates).toHaveLength(7);
       expect(templates.map(t => t.id)).toEqual([
         'analysis-to-architecture',
         'full-product-design',
         'story-to-implementation',
         'full-app-development',
-        'code-review-pipeline'
+        'code-review-pipeline',
+        'market-study',
+        'full-specifications'
       ]);
 
-      // Verify each template has steps
+      // Verify each template has steps (market-study has 1 step, others have 2+)
       for (const tmpl of templates) {
-        expect(tmpl.steps.length).toBeGreaterThanOrEqual(2);
+        expect(tmpl.steps.length).toBeGreaterThanOrEqual(1);
         expect(tmpl.name).toBeDefined();
         expect(tmpl.description).toBeDefined();
         for (const step of tmpl.steps) {

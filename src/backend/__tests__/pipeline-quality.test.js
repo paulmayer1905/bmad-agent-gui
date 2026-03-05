@@ -91,9 +91,9 @@ describe('AgentCoordinator — Pipeline Templates & Instructions (new features)'
   // ═══════════════════════════════════════════════════════════════════════
 
   describe('Pipeline Templates — Updated structure', () => {
-    test('should return 5 predefined templates', () => {
+    test('should return 7 predefined templates', () => {
       const templates = coordinator.getPipelineTemplates();
-      expect(templates).toHaveLength(5);
+      expect(templates).toHaveLength(7);
     });
 
     test('should include all expected template IDs', () => {

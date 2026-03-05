@@ -42,6 +42,383 @@ Justifie ton choix.
 
 IMPORTANT : Sois exhaustif dans l'identification des fonctionnalités. Un jeu Snake par exemple a au minimum : affichage du plateau, déplacement du serpent, génération de nourriture, détection de collisions, score, game over, redémarrage, etc.`;
 
+// ── MARKET STUDY ─────────────────────────────────────────────────────────
+const MARKET_STUDY_INSTRUCTIONS = `Réalise une étude de marché complète et structurée pour ce produit/application.
+
+Tu DOIS produire un document d'étude de marché contenant :
+
+## 1. Contexte et périmètre de l'étude
+- Définition du marché adressé
+- Zone géographique / segment cible
+- Date de l'étude et hypothèses de base
+
+## 2. Analyse de l'existant — Solutions concurrentes
+
+Pour CHAQUE concurrent identifié, produis une fiche :
+
+### 🏢 [Nom du concurrent]
+| Critère | Détail |
+|---------|--------|
+| **Type** | SaaS / Open-source / Desktop / Mobile |
+| **Positionnement** | Résumé en 1 phrase |
+| **Cible** | Public visé |
+| **Prix** | Gratuit / Freemium / Payant (fourchette) |
+| **Forces** | Top 3 points forts |
+| **Faiblesses** | Top 3 points faibles |
+| **Part de marché** | Estimation si connue |
+
+**Minimum 3 concurrents directs + 2 concurrents indirects.**
+
+## 3. Points de douleur des utilisateurs (User Pain Points)
+
+Basé sur les retours utilisateurs typiques des solutions existantes :
+
+### 🔴 Douleurs critiques (bloquants)
+- [Pain point] — *Exemple concret d'impact utilisateur*
+
+### 🟡 Douleurs majeures (friction importante)
+- [Pain point] — *Exemple concret*
+
+### 🟢 Douleurs mineures (irritants)
+- [Pain point] — *Exemple concret*
+
+**Sources potentielles :** avis App Store / Google Play, forums Reddit, Product Hunt comments, G2/Capterra reviews, GitHub issues des projets open-source concurrents.
+
+## 4. Analyse comparative — Tableau de positionnement
+
+| Fonctionnalité clé | Notre produit | Concurrent A | Concurrent B | Concurrent C |
+|-------------------|:---:|:---:|:---:|:---:|
+| [Feature 1] | ✅ | ✅ | ❌ | ✅ |
+| [Feature 2] | ✅ | ❌ | ✅ | ❌ |
+| [Feature 3] | 🔄 Prévu | ✅ | ✅ | ❌ |
+
+Légende : ✅ Présent | ❌ Absent | 🔄 Prévu | ⚠️ Partiel
+
+## 5. Opportunités de différenciation
+
+Liste les **gaps du marché** non couverts par les solutions existantes :
+1. **[Opportunité 1]** — Pourquoi c'est un avantage concurrentiel
+2. **[Opportunité 2]** — …
+3. **[Opportunité 3]** — …
+
+## 6. Sizing du marché (TAM / SAM / SOM)
+
+| Segment | Taille estimée | Méthode d'estimation |
+|---------|---------------|---------------------|
+| **TAM** (Total Addressable Market) | X utilisateurs / X M€ | Bottom-up ou analogie |
+| **SAM** (Serviceable Addressable Market) | X utilisateurs | Filtrage géo/segment |
+| **SOM** (Serviceable Obtainable Market) | X utilisateurs (Y%) | Part réaliste Y1-Y3 |
+
+## 7. Tendances du marché
+- Tendances technologiques pertinentes (IA, no-code, mobile-first, etc.)
+- Évolutions réglementaires potentielles
+- Menaces et opportunités émergentes
+
+## 8. Recommandation stratégique de positionnement
+- **Proposition de valeur unique** (UVP) en 1 phrase percutante
+- Segment prioritaire à cibler en Y1
+- Stratégie de go-to-market recommandée
+
+IMPORTANT : Sois précis et factuel. Si tu fais des estimations, indique-le clairement. Utilise le conditionnel pour les projections non vérifiables.`;
+
+// ── FUNCTIONAL SPECIFICATIONS ─────────────────────────────────────────────
+const FUNCTIONAL_SPEC_INSTRUCTIONS = `Rédige les Spécifications Fonctionnelles Détaillées (SFD) de l'application.
+
+Basé sur le PRD, le backlog, et l'étude de marché, produis un document de spécifications fonctionnelles au standard professionnel :
+
+## 1. Objet et périmètre du document
+- Version du document, date, auteur (agent PM)
+- Résumé de l'application en 3-5 phrases
+- Périmètre couvert (liste des fonctionnalités) et exclu
+
+## 2. Glossaire
+Tableau des termes métier utilisés dans le document :
+| Terme | Définition |
+|-------|------------|
+| [Terme 1] | Définition précise dans le contexte de l'application |
+
+## 3. Acteurs et rôles
+
+Pour CHAQUE acteur du système :
+| Acteur | Description | Droits / Permissions | Conditions d'accès |
+|--------|-------------|---------------------|-------------------|
+| [Acteur 1] | … | Lecture, écriture… | Authentifié, abonné… |
+
+## 4. Cas d'utilisation (Use Cases)
+
+Pour CHAQUE fonctionnalité principale, produis une fiche UC :
+
+---
+### UC-[N] : [Titre du cas d'utilisation]
+**Acteur principal :** [nom de l'acteur]
+**Objectif :** [Ce que l'acteur veut accomplir]
+**Préconditions :** [Ce qui doit être vrai avant l'exécution]
+**Postconditions :** [État du système après l'exécution réussie]
+
+**Scénario nominal (chemin heureux) :**
+1. [Action acteur / Réaction système]
+2. …
+
+**Scénarios alternatifs :**
+- **Alt-[N]a** : [Condition] → [Action alternative]
+
+**Scénarios d'exception :**
+- **Exc-[N]a** : [Erreur] → [Comportement du système]
+
+**Règles de gestion associées :** RG-[N]
+---
+
+**Minimum 1 UC par épic du PRD.**
+
+## 5. Règles de gestion (RG)
+
+Tableau exhaustif des règles métier :
+| ID | Règle | Priorité | UC liés |
+|----|-------|----------|---------|
+| RG-001 | [Description précise de la règle] | Obligatoire / Optionnel | UC-1 |
+
+## 6. Exigences d'interface utilisateur
+- Contraintes d'accessibilité (RGAA / WCAG niveau visé)
+- Contraintes de responsive design
+- Messages d'erreur standardisés
+
+## 7. Exigences de données
+- Données obligatoires vs optionnelles par formulaire/entité
+- Règles de validation (format, longueur, type)
+- Règles de confidentialité (RGPD / données personnelles)
+
+## 8. Matrice de traçabilité
+Lien entre exigences fonctionnelles et user stories du backlog :
+| ID Exigence | Description | US liées | Priorité |
+|-------------|-------------|----------|---------|
+| EF-001 | … | US-1.1, US-1.2 | Must-Have |
+
+IMPORTANT : Chaque règle de gestion doit être univoque, testable, et référencée dans au moins un UC.`;
+
+// ── TECHNICAL SPECIFICATIONS ──────────────────────────────────────────────
+const TECHNICAL_SPEC_INSTRUCTIONS = `Rédige les Spécifications Techniques Détaillées (STD) de l'application.
+
+Basé sur l'architecture, les spécifications fonctionnelles, et le PRD, produis un document de spécifications techniques complet :
+
+## 1. Objet et périmètre
+- Version du document, date, auteur (agent Architecte)
+- Stack technique retenue avec justifications
+- Contraintes techniques non-fonctionnelles (performance, sécurité, scalabilité)
+
+## 2. Architecture détaillée
+
+### 2.1 Diagramme d'architecture
+Description textuelle ou ASCII du schéma d'architecture :
+\`\`\`
+[Client]──HTTP/WS──▶[API Gateway]──▶[Service A]──▶[DB]
+                                  ──▶[Service B]──▶[Cache]
+\`\`\`
+
+### 2.2 Composants techniques
+Pour CHAQUE composant :
+| Composant | Technologie | Rôle | Dépendances |
+|-----------|-------------|------|-------------|
+| [Composant 1] | [Tech] | [Responsabilité] | [Ce dont il dépend] |
+
+## 3. API — Contrats d'interface
+
+Pour CHAQUE endpoint ou méthode exposée :
+
+---
+### [MÉTHODE] /api/[ressource]
+**Description :** [Ce que fait cet endpoint]
+**Authentification :** Bearer JWT / API Key / Publique
+
+**Paramètres de requête :**
+| Nom | Type | Requis | Description |
+|-----|------|:------:|-------------|
+| [param] | string | ✅ | … |
+
+**Corps de la requête (JSON) :**
+\`\`\`json
+{
+  "field": "type — description"
+}
+\`\`\`
+
+**Réponse succès (200/201) :**
+\`\`\`json
+{
+  "id": "uuid",
+  "field": "value"
+}
+\`\`\`
+
+**Codes d'erreur :**
+| Code | Signification | Cause |
+|------|---------------|-------|
+| 400 | Bad Request | Paramètre manquant ou invalide |
+| 401 | Unauthorized | Token absent ou expiré |
+| 404 | Not Found | Ressource inexistante |
+---
+
+## 4. Modèle de données (Schéma)
+
+Pour CHAQUE entité :
+
+### Entité : [NomEntité]
+\`\`\`
+Table: nom_table
+├── id          UUID        PK, NOT NULL, DEFAULT gen_random_uuid()
+├── field_name  VARCHAR(255) NOT NULL
+├── created_at  TIMESTAMP   NOT NULL, DEFAULT NOW()
+└── updated_at  TIMESTAMP   NOT NULL
+\`\`\`
+
+**Relations :**
+- [NomEntité] 1──N [AutreEntité] (via foreign_key)
+
+**Index :** Lister les index nécessaires pour les performances
+
+## 5. Sécurité
+
+| Vecteur d'attaque | Mesure de protection | Implémentation |
+|-------------------|---------------------|----------------|
+| Injection SQL | ORM paramétré | Sequelize / Prisma |
+| XSS | Échappement des sorties | DOMPurify / CSP headers |
+| CSRF | Token CSRF + SameSite Cookie | … |
+| Auth | JWT avec expiration courte | Rotation toutes les 15min |
+| Rate limiting | 100 req/min par IP | express-rate-limit |
+
+## 6. Exigences non-fonctionnelles (ENF)
+
+| ID | Catégorie | Exigence | Seuil mesurable |
+|----|-----------|----------|-----------------|
+| ENF-001 | Performance | Temps de réponse API | p95 < 200ms |
+| ENF-002 | Disponibilité | Uptime | 99.9% / mois |
+| ENF-003 | Scalabilité | Utilisateurs simultanés | 1000 sans dégradation |
+| ENF-004 | Sécurité | Chiffrement données transit | TLS 1.3 minimum |
+
+## 7. Infrastructure et déploiement
+
+### Environnements
+| Env | URL | Usage | Configuration |
+|-----|-----|-------|---------------|
+| dev | localhost | Développement local | Docker Compose |
+| staging | staging.app.com | Tests d'intégration | Cloud (same as prod) |
+| prod | app.com | Production | Cloud HA |
+
+### Pipeline CI/CD
+\`\`\`
+Push Git → Lint + Tests → Build Docker → Deploy Staging → Tests E2E → Deploy Prod
+\`\`\`
+
+## 8. Plan de tests techniques
+
+| Type de test | Outil | Couverture cible | Responsable |
+|-------------|-------|-----------------|-------------|
+| Unitaires | Jest / PyTest | 80% | Dev |
+| Intégration | Supertest | Tous les endpoints | QA |
+| E2E | Playwright / Cypress | Flux critiques | QA |
+| Performance | k6 / Artillery | ENF-001 à ENF-003 | DevOps |
+| Sécurité | OWASP ZAP | OWASP Top 10 | Architect |
+
+IMPORTANT : Chaque exigence non-fonctionnelle DOIT avoir un seuil mesurable et un outil de vérification associé.`;
+
+// ── ROADMAP ───────────────────────────────────────────────────────────────
+const ROADMAP_INSTRUCTIONS = `Produis la Roadmap produit complète, stratégique et opérationnelle.
+
+Basé sur le PRD, le backlog priorisé, l'étude de marché, et les spécifications, produis un document de roadmap en deux parties : vision stratégique + plan d'exécution.
+
+## 1. Vision et objectifs stratégiques
+
+### Étoile du Nord (North Star Metric)
+- **Métrique principale :** [La métrique unique qui mesure le succès du produit]
+- **Cible Y1 :** [Valeur à atteindre dans 12 mois]
+
+### Objectifs par horizon
+| Horizon | Période | Objectif principal | Critère de succès |
+|---------|---------|-------------------|------------------|
+| Court terme | M1 – M3 | [MVP live] | [X utilisateurs actifs] |
+| Moyen terme | M4 – M9 | [Croissance] | [Y DAU / MRR] |
+| Long terme | M10 – M18 | [Scalabilité / Expansion] | [Z ARR / marchés] |
+
+## 2. Roadmap par phase (Timeline)
+
+### 🏗️ Phase 1 — MVP (Mois 1-3)
+**Thème :** [Résoudre le problème core]
+**Objectif :** Livrer la valeur essentielle aux early adopters
+
+| Semaine | Epic / Feature | Priorité | Owner | Effort |
+|---------|---------------|----------|-------|--------|
+| S1-S2 | [Epic 1 : Setup & Infrastructure] | Critique | Tech Lead | L |
+| S3-S4 | [Epic 2 : Feature principale] | Critique | Dev | XL |
+| S5-S6 | [Epic 3 : Authentification] | Haute | Dev | M |
+| S7-S8 | [Epic 4 : Dashboard basique] | Haute | Dev | M |
+| S9-S10 | [Tests & QA] | Critique | QA | M |
+| S11-S12 | [Beta launch + feedback] | Critique | PM | S |
+
+**Jalons (Milestones) :**
+- 📍 **M1** : Infrastructure en place, CI/CD opérationnel
+- 📍 **M2** : Feature principale fonctionnelle en staging
+- 📍 **M3** : MVP livré, 50 beta users onboardés
+
+### 🚀 Phase 2 — Croissance (Mois 4-9)
+**Thème :** [Améliorer la rétention et l'acquisition]
+**Objectif :** Atteindre le Product-Market Fit
+
+| Trimestre | Epic / Feature | Priorité | Dépendance |
+|-----------|--------------|----------|------------|
+| Q2 | [Feature différenciante 1] | Haute | Phase 1 |
+| Q2 | [Intégrations tierces] | Moyenne | Phase 1 |
+| Q3 | [Premium / Monétisation] | Haute | PMF validé |
+| Q3 | [Mobile app] | Moyenne | API stable |
+
+**Jalons :**
+- 📍 **M6** : 500 utilisateurs actifs mensuels, NPS > 40
+- 📍 **M9** : Premier revenu récurrent, churn < 5%
+
+### 🌍 Phase 3 — Scale (Mois 10-18)
+**Thème :** [Expansion et consolidation]
+
+| Période | Initiative | Impact attendu |
+|---------|-----------|---------------|
+| M10-M12 | [Internationalisation] | +30% TAM adressable |
+| M13-M15 | [API publique / Platform] | Effets de réseau |
+| M16-M18 | [Enterprise tier] | ACV multiplié par 5 |
+
+**Jalons :**
+- 📍 **M12** : Disponible en 3 langues
+- 📍 **M18** : [Objectif final ambitieux mais réaliste]
+
+## 3. Dépendances critiques et risques de la roadmap
+
+| Risque | Phase impactée | Probabilité | Impact | Mitigation |
+|--------|--------------|:-----------:|:------:|-----------|
+| Retard tech majeur | Phase 1 | Moyenne | Critique | Scope MVP réduit à 60% |
+| Adoption insuffisante | Phase 2 | Faible | Haute | Pivot feature si NPS < 20 |
+| Concurrent agressif | Phase 2-3 | Moyenne | Haute | Accélérer différenciation |
+
+## 4. Backlog stratégique (Post-Phase 3)
+
+Features identifiées mais non planifiées, à réévaluer selon la traction :
+- [Feature future 1] — Valeur estimée : Haute | Effort : XL
+- [Feature future 2] — Valeur estimée : Moyenne | Effort : M
+
+## 5. Métriques de suivi par phase
+
+| Phase | KPI | Outil de mesure | Fréquence revue |
+|-------|-----|----------------|-----------------|
+| Phase 1 | Bugs critiques en prod | Sentry | Quotidien |
+| Phase 1-2 | DAU / WAU / MAU | Mixpanel / Amplitude | Hebdo |
+| Phase 2 | MRR, Churn rate | Stripe / Baremetrics | Mensuel |
+| Phase 3 | NPS, CSAT | Typeform | Trimestriel |
+
+## 6. Go-to-Market par phase
+
+| Phase | Canal principal | Action | Budget estimé |
+|-------|----------------|--------|---------------|
+| Phase 1 | Community (Reddit, Discord) | Lancement Product Hunt | 0€ |
+| Phase 2 | SEO + Content | Blog + Docs publics | 500€/mois |
+| Phase 3 | Paid acquisition + Partnerships | Google Ads + Intégrations | 5k€/mois |
+
+IMPORTANT : La roadmap doit être ambitieuse mais réaliste. Chaque phase doit avoir des critères d'arrêt/pivot clairement définis si les métriques ne sont pas atteintes.`;
+
 // ── PM / PRD ─────────────────────────────────────────────────────────────
 const PM_PRD_INSTRUCTIONS = `Rédige un Product Requirements Document (PRD) complet et structuré.
 
@@ -673,6 +1050,55 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
           { agent: 'architect', task: 'Revue architecture', instructions: 'Évalue l\'architecture et la conception du code soumis. Identifie les problèmes structurels, les anti-patterns, et les améliorations possibles.', artifactType: 'analysis', saveArtifact: true },
           { agent: 'qa', task: 'Revue qualité', instructions: 'Analyse la qualité du code : tests manquants, bugs potentiels, bonnes pratiques, sécurité, performance.', artifactType: 'test', saveArtifact: true },
           { agent: 'dev', task: 'Synthèse et corrections', instructions: 'Synthétise les retours d\'architecture et QA. Propose et implémente les corrections concrètes.', artifactType: 'code', saveArtifact: true }
+        ]
+      },
+      {
+        id: 'market-study',
+        name: '🔍 Étude de marché',
+        description: 'Analyse concurrentielle approfondie, pain points utilisateurs, opportunités de différenciation',
+        steps: [
+          {
+            agent: 'analyst',
+            task: 'Étude de marché complète',
+            instructions: MARKET_STUDY_INSTRUCTIONS,
+            artifactType: 'analysis',
+            saveArtifact: true
+          }
+        ]
+      },
+      {
+        id: 'full-specifications',
+        name: '📋 Spécifications complètes',
+        description: 'Étude de marché (Analyst) → Specs fonctionnelles (PM) → Specs techniques (Architect) → Roadmap (PM)',
+        steps: [
+          {
+            agent: 'analyst',
+            task: 'Étude de marché',
+            instructions: MARKET_STUDY_INSTRUCTIONS,
+            artifactType: 'analysis',
+            saveArtifact: true
+          },
+          {
+            agent: 'pm',
+            task: 'Spécifications fonctionnelles',
+            instructions: FUNCTIONAL_SPEC_INSTRUCTIONS,
+            artifactType: 'documentation',
+            saveArtifact: true
+          },
+          {
+            agent: 'architect',
+            task: 'Spécifications techniques',
+            instructions: TECHNICAL_SPEC_INSTRUCTIONS,
+            artifactType: 'architecture',
+            saveArtifact: true
+          },
+          {
+            agent: 'pm',
+            task: 'Roadmap produit',
+            instructions: ROADMAP_INSTRUCTIONS,
+            artifactType: 'documentation',
+            saveArtifact: true
+          }
         ]
       }
     ];
