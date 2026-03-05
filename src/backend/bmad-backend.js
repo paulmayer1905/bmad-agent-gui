@@ -81,12 +81,43 @@ class BMADBackend {
     await this._docManager.initialize();
 
     // Initialize coordinator (delegation, pipeline, party mode)
+    const pipelineInstructions = await this._loadPipelineInstructions();
     this._coordinator = new AgentCoordinator({
       aiService: this._aiService,
       projectContext: this._projectContext,
       bmadBackend: this,
-      workspaceManager: this._workspaceManager
+      workspaceManager: this._workspaceManager,
+      pipelineInstructions
     });
+  }
+
+  /**
+   * Load pipeline instruction files from bmad-core/tasks/pipeline-*.md
+   * These are the shared instruction templates used by both the GUI pipelines
+   * and the VS Code agent selector. Editing one file updates both.
+   * @returns {Object} Map of taskId → instruction text content
+   */
+  async _loadPipelineInstructions() {
+    const instructions = {};
+    try {
+      const tasksDir = path.join(this.coreRoot, 'tasks');
+      const files = await fs.readdir(tasksDir);
+      const pipelineFiles = files.filter(f => f.startsWith('pipeline-') && f.endsWith('.md'));
+
+      for (const file of pipelineFiles) {
+        const taskId = file.replace('.md', '');
+        const content = await fs.readFile(path.join(tasksDir, file), 'utf8');
+        // Strip the markdown title and PIPELINE-TASK-META comment block, keep instruction body
+        const body = content
+          .replace(/^#\s+.+\n+/m, '')                         // remove H1 title
+          .replace(/<!--\s*PIPELINE-TASK-META[\s\S]*?-->\s*/m, '') // remove meta block
+          .trim();
+        instructions[taskId] = body;
+      }
+    } catch (err) {
+      console.warn('Could not load pipeline instructions from bmad-core/tasks/, using built-in defaults:', err.message);
+    }
+    return instructions;
   }
 
   // ─── Agents ─────────────────────────────────────────────────────────────

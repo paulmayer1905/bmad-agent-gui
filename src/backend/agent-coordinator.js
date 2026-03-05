@@ -722,11 +722,26 @@ class AgentCoordinator extends EventEmitter {
     this.bmadBackend = options.bmadBackend;
     this.workspaceManager = options.workspaceManager || null;
 
+    // Pipeline instructions loaded from bmad-core/tasks/pipeline-*.md
+    // Falls back to hardcoded constants if a file is missing
+    this._pipelineInstructions = options.pipelineInstructions || {};
+
     // Active party sessions
     this.partySessions = new Map();
 
     // Active pipelines
     this.activePipelines = new Map();
+  }
+
+  /**
+   * Get a pipeline instruction by task-id. Uses the shared file from
+   * bmad-core/tasks/ if loaded, otherwise falls back to the hardcoded constant.
+   * @param {string} taskId - e.g. 'pipeline-analyst-analysis'
+   * @param {string} fallback - built-in constant as fallback
+   * @returns {string}
+   */
+  _instr(taskId, fallback) {
+    return this._pipelineInstructions[taskId] || fallback;
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -1165,8 +1180,8 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
         name: 'Analyse → Architecture',
         description: 'Analyste → Architecte : de l\'idée à la conception technique',
         steps: [
-          { agent: 'analyst', task: 'Analyse des besoins', instructions: ANALYST_INSTRUCTIONS, artifactType: 'analysis', saveArtifact: true },
-          { agent: 'architect', task: 'Conception architecture', instructions: ARCHITECT_INSTRUCTIONS, artifactType: 'architecture', saveArtifact: true }
+          { agent: 'analyst', task: 'Analyse des besoins', instructions: this._instr('pipeline-analyst-analysis', ANALYST_INSTRUCTIONS), artifactType: 'analysis', saveArtifact: true },
+          { agent: 'architect', task: 'Conception architecture', instructions: this._instr('pipeline-architect-design', ARCHITECT_INSTRUCTIONS), artifactType: 'architecture', saveArtifact: true }
         ]
       },
       {
@@ -1174,14 +1189,14 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
         name: 'Conception produit complète',
         description: 'Analyste → PM (PRD + Épics/Stories) → PO (Backlog) → Architecte → UX — avec revue croisée',
         steps: [
-          { agent: 'analyst', task: 'Étude de marché et besoins', instructions: ANALYST_INSTRUCTIONS, artifactType: 'analysis', saveArtifact: true },
-          { agent: 'pm', task: 'Rédaction PRD avec Épics et User Stories', instructions: PM_PRD_INSTRUCTIONS, artifactType: 'prd', saveArtifact: true,
+          { agent: 'analyst', task: 'Étude de marché et besoins', instructions: this._instr('pipeline-analyst-analysis', ANALYST_INSTRUCTIONS), artifactType: 'analysis', saveArtifact: true },
+          { agent: 'pm', task: 'Rédaction PRD avec Épics et User Stories', instructions: this._instr('pipeline-pm-prd', PM_PRD_INSTRUCTIONS), artifactType: 'prd', saveArtifact: true,
             peerReview: { reviewer: 'analyst', maxRounds: 2, focus: 'cohérence entre l\'analyse des besoins et les user stories' } },
-          { agent: 'po', task: 'Validation et backlog priorisé', instructions: PO_BACKLOG_INSTRUCTIONS, artifactType: 'backlog', saveArtifact: true,
+          { agent: 'po', task: 'Validation et backlog priorisé', instructions: this._instr('pipeline-po-backlog', PO_BACKLOG_INSTRUCTIONS), artifactType: 'backlog', saveArtifact: true,
             peerReview: { reviewer: 'pm', maxRounds: 1, focus: 'couverture complète des épics du PRD et faisabilité du Sprint 1' } },
-          { agent: 'architect', task: 'Architecture technique', instructions: ARCHITECT_INSTRUCTIONS, artifactType: 'architecture', saveArtifact: true,
+          { agent: 'architect', task: 'Architecture technique', instructions: this._instr('pipeline-architect-design', ARCHITECT_INSTRUCTIONS), artifactType: 'architecture', saveArtifact: true,
             peerReview: { reviewer: 'po', maxRounds: 1, focus: 'correspondance entre l\'architecture et les user stories du backlog' } },
-          { agent: 'ux-expert', task: 'Design UX/UI', instructions: UX_DESIGN_INSTRUCTIONS, artifactType: 'design', saveArtifact: true }
+          { agent: 'ux-expert', task: 'Design UX/UI', instructions: this._instr('pipeline-ux-design', UX_DESIGN_INSTRUCTIONS), artifactType: 'design', saveArtifact: true }
         ]
       },
       {
@@ -1189,10 +1204,10 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
         name: 'PRD → Backlog → Dev → QA',
         description: 'PM rédige le PRD, PO crée le backlog, Dev implémente, QA valide',
         steps: [
-          { agent: 'pm', task: 'Rédaction PRD et user stories', instructions: PM_PRD_INSTRUCTIONS, artifactType: 'prd', saveArtifact: true },
-          { agent: 'po', task: 'Backlog priorisé et critères d\'acceptation', instructions: PO_BACKLOG_INSTRUCTIONS, artifactType: 'backlog', saveArtifact: true },
-          { agent: 'dev', task: 'Implémentation du code', instructions: CODE_GEN_INSTRUCTIONS, artifactType: 'code', saveArtifact: true, extractCode: true },
-          { agent: 'qa', task: 'Tests et validation', instructions: QA_TEST_INSTRUCTIONS, artifactType: 'test', saveArtifact: true, extractCode: true }
+          { agent: 'pm', task: 'Rédaction PRD et user stories', instructions: this._instr('pipeline-pm-prd', PM_PRD_INSTRUCTIONS), artifactType: 'prd', saveArtifact: true },
+          { agent: 'po', task: 'Backlog priorisé et critères d\'acceptation', instructions: this._instr('pipeline-po-backlog', PO_BACKLOG_INSTRUCTIONS), artifactType: 'backlog', saveArtifact: true },
+          { agent: 'dev', task: 'Implémentation du code', instructions: this._instr('pipeline-dev-code', CODE_GEN_INSTRUCTIONS), artifactType: 'code', saveArtifact: true, extractCode: true },
+          { agent: 'qa', task: 'Tests et validation', instructions: this._instr('pipeline-qa-test', QA_TEST_INSTRUCTIONS), artifactType: 'test', saveArtifact: true, extractCode: true }
         ]
       },
       {
@@ -1201,17 +1216,17 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
         description: 'Équipe complète : Analyste → PM → PO → Architecte → UX → Dev → QA → Fix',
         requiresWorkspace: true,
         steps: [
-          { agent: 'analyst', task: 'Analyse des besoins et faisabilité', instructions: ANALYST_INSTRUCTIONS, artifactType: 'analysis', saveArtifact: true },
-          { agent: 'pm', task: 'PRD avec Épics et User Stories', instructions: PM_PRD_INSTRUCTIONS, artifactType: 'prd', saveArtifact: true,
+          { agent: 'analyst', task: 'Analyse des besoins et faisabilité', instructions: this._instr('pipeline-analyst-analysis', ANALYST_INSTRUCTIONS), artifactType: 'analysis', saveArtifact: true },
+          { agent: 'pm', task: 'PRD avec Épics et User Stories', instructions: this._instr('pipeline-pm-prd', PM_PRD_INSTRUCTIONS), artifactType: 'prd', saveArtifact: true,
             peerReview: { reviewer: 'analyst', maxRounds: 2, focus: 'cohérence entre l\'analyse et les user stories' } },
-          { agent: 'po', task: 'Backlog priorisé et critères d\'acceptation', instructions: PO_BACKLOG_INSTRUCTIONS, artifactType: 'backlog', saveArtifact: true,
+          { agent: 'po', task: 'Backlog priorisé et critères d\'acceptation', instructions: this._instr('pipeline-po-backlog', PO_BACKLOG_INSTRUCTIONS), artifactType: 'backlog', saveArtifact: true,
             peerReview: { reviewer: 'pm', maxRounds: 1, focus: 'couverture complète des épics et faisabilité Sprint 1' } },
-          { agent: 'architect', task: 'Architecture technique et structure fichiers', instructions: ARCHITECT_INSTRUCTIONS, artifactType: 'architecture', saveArtifact: true,
+          { agent: 'architect', task: 'Architecture technique et structure fichiers', instructions: this._instr('pipeline-architect-design', ARCHITECT_INSTRUCTIONS), artifactType: 'architecture', saveArtifact: true,
             peerReview: { reviewer: 'po', maxRounds: 1, focus: 'faisabilité technique des user stories du backlog' } },
-          { agent: 'ux-expert', task: 'Design UX/UI', instructions: UX_DESIGN_INSTRUCTIONS, artifactType: 'design', saveArtifact: true },
-          { agent: 'dev', task: 'Génération du code complet', instructions: FULL_APP_CODE_INSTRUCTIONS, artifactType: 'code', saveArtifact: true, extractCode: true },
-          { agent: 'qa', task: 'Tests et validation de la couverture', instructions: QA_TEST_INSTRUCTIONS, artifactType: 'test', saveArtifact: true, extractCode: true },
-          { agent: 'dev', task: 'Corrections et finalisation', instructions: FIX_AND_FINALIZE_INSTRUCTIONS, artifactType: 'code', saveArtifact: true, extractCode: true }
+          { agent: 'ux-expert', task: 'Design UX/UI', instructions: this._instr('pipeline-ux-design', UX_DESIGN_INSTRUCTIONS), artifactType: 'design', saveArtifact: true },
+          { agent: 'dev', task: 'Génération du code complet', instructions: this._instr('pipeline-dev-full-app', FULL_APP_CODE_INSTRUCTIONS), artifactType: 'code', saveArtifact: true, extractCode: true },
+          { agent: 'qa', task: 'Tests et validation de la couverture', instructions: this._instr('pipeline-qa-test', QA_TEST_INSTRUCTIONS), artifactType: 'test', saveArtifact: true, extractCode: true },
+          { agent: 'dev', task: 'Corrections et finalisation', instructions: this._instr('pipeline-dev-fix-finalize', FIX_AND_FINALIZE_INSTRUCTIONS), artifactType: 'code', saveArtifact: true, extractCode: true }
         ]
       },
       {
@@ -1232,7 +1247,7 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
           {
             agent: 'analyst',
             task: 'Étude de marché complète',
-            instructions: MARKET_STUDY_INSTRUCTIONS,
+            instructions: this._instr('pipeline-analyst-market-study', MARKET_STUDY_INSTRUCTIONS),
             artifactType: 'analysis',
             saveArtifact: true
           }
@@ -1246,14 +1261,14 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
           {
             agent: 'analyst',
             task: 'Étude de marché',
-            instructions: MARKET_STUDY_INSTRUCTIONS,
+            instructions: this._instr('pipeline-analyst-market-study', MARKET_STUDY_INSTRUCTIONS),
             artifactType: 'analysis',
             saveArtifact: true
           },
           {
             agent: 'pm',
             task: 'Spécifications fonctionnelles',
-            instructions: FUNCTIONAL_SPEC_INSTRUCTIONS,
+            instructions: this._instr('pipeline-pm-functional-spec', FUNCTIONAL_SPEC_INSTRUCTIONS),
             artifactType: 'documentation',
             saveArtifact: true,
             peerReview: { reviewer: 'analyst', maxRounds: 2, focus: 'cohérence entre les specs fonctionnelles et l\'étude de marché' }
@@ -1261,7 +1276,7 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
           {
             agent: 'architect',
             task: 'Spécifications techniques',
-            instructions: TECHNICAL_SPEC_INSTRUCTIONS,
+            instructions: this._instr('pipeline-architect-technical-spec', TECHNICAL_SPEC_INSTRUCTIONS),
             artifactType: 'architecture',
             saveArtifact: true,
             peerReview: { reviewer: 'pm', maxRounds: 2, focus: 'alignement des specs techniques avec les exigences fonctionnelles' }
@@ -1269,7 +1284,7 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
           {
             agent: 'pm',
             task: 'Roadmap produit',
-            instructions: ROADMAP_INSTRUCTIONS,
+            instructions: this._instr('pipeline-pm-roadmap', ROADMAP_INSTRUCTIONS),
             artifactType: 'documentation',
             saveArtifact: true,
             peerReview: { reviewer: 'analyst', maxRounds: 1, focus: 'réalisme des objectifs au regard de l\'étude de marché' }

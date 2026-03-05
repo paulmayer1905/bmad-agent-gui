@@ -1010,4 +1010,102 @@ describe('AgentCoordinator', () => {
       );
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  Pipeline Instructions Synchronization
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('Pipeline Instructions Sync (single source of truth)', () => {
+    const EXPECTED_TASK_IDS = [
+      'pipeline-analyst-analysis',
+      'pipeline-analyst-market-study',
+      'pipeline-pm-functional-spec',
+      'pipeline-pm-prd',
+      'pipeline-pm-roadmap',
+      'pipeline-po-backlog',
+      'pipeline-architect-design',
+      'pipeline-architect-technical-spec',
+      'pipeline-ux-design',
+      'pipeline-dev-code',
+      'pipeline-dev-full-app',
+      'pipeline-dev-fix-finalize',
+      'pipeline-qa-test'
+    ];
+
+    test('constructor stores pipelineInstructions map', () => {
+      const instrMap = { 'pipeline-analyst-analysis': 'custom text' };
+      const coord = new AgentCoordinator({
+        aiService: mockAIService,
+        projectContext: mockProjectContext,
+        bmadBackend: mockBackend,
+        pipelineInstructions: instrMap
+      });
+      expect(coord._pipelineInstructions).toBe(instrMap);
+    });
+
+    test('constructor defaults to empty map when no pipelineInstructions', () => {
+      expect(coordinator._pipelineInstructions).toEqual({});
+    });
+
+    test('_instr() returns dynamic content when available', () => {
+      const coord = new AgentCoordinator({
+        aiService: mockAIService,
+        projectContext: mockProjectContext,
+        bmadBackend: mockBackend,
+        pipelineInstructions: { 'pipeline-analyst-analysis': 'DYNAMIC CONTENT' }
+      });
+      const result = coord._instr('pipeline-analyst-analysis', 'FALLBACK');
+      expect(result).toBe('DYNAMIC CONTENT');
+    });
+
+    test('_instr() falls back to hardcoded constant when file not loaded', () => {
+      const result = coordinator._instr('pipeline-analyst-analysis', 'HARDCODED FALLBACK');
+      expect(result).toBe('HARDCODED FALLBACK');
+    });
+
+    test('all pipeline templates reference valid instruction task IDs', () => {
+      // Provide all task IDs with marker content so we can verify they're used
+      const instrMap = {};
+      EXPECTED_TASK_IDS.forEach(id => { instrMap[id] = `LOADED:${id}`; });
+
+      const coord = new AgentCoordinator({
+        aiService: mockAIService,
+        projectContext: mockProjectContext,
+        bmadBackend: mockBackend,
+        pipelineInstructions: instrMap
+      });
+
+      const templates = coord.getPipelineTemplates();
+
+      // Collect all instructions from all pipeline steps
+      const allInstructions = [];
+      for (const tpl of templates) {
+        for (const step of tpl.steps) {
+          allInstructions.push(step.instructions);
+        }
+      }
+
+      // Every LOADED:* marker should appear at least once in the pipeline steps
+      const usedIds = EXPECTED_TASK_IDS.filter(id =>
+        allInstructions.some(instr => instr === `LOADED:${id}`)
+      );
+
+      expect(usedIds).toEqual(EXPECTED_TASK_IDS);
+    });
+
+    test('pipeline templates work without pipelineInstructions (graceful fallback)', () => {
+      // coordinator created with no pipelineInstructions (default empty {})
+      const templates = coordinator.getPipelineTemplates();
+      expect(templates.length).toBeGreaterThanOrEqual(6);
+
+      // Every step should have a non-empty instructions string (hardcoded fallback)
+      for (const tpl of templates) {
+        for (const step of tpl.steps) {
+          expect(step.instructions).toBeTruthy();
+          expect(typeof step.instructions).toBe('string');
+          expect(step.instructions.length).toBeGreaterThan(10);
+        }
+      }
+    });
+  });
 });
