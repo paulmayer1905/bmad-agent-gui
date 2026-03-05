@@ -1,0 +1,112 @@
+{
+  "name": "bmad-agent-launcher",
+  "displayName": "BMAD Agent Launcher",
+  "description": "BMAD-METHOD agents as VS Code Chat Participants — Party Mode, Orchestrator, Master and all specialists",
+  "version": "1.0.0",
+  "publisher": "bmad-method",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": ["Chat", "Other"],
+  "icon": "icon.png",
+  "activationEvents": [],
+  "main": "./extension.js",
+  "extensionDependencies": [
+    "github.copilot-chat"
+  ],
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "bmad.party",
+        "fullName": "BMAD Party Mode",
+        "name": "bmad-party",
+        "description": "Mode collaboratif multi-agents — sollicite tous les spécialistes BMAD et synthétise leurs réponses",
+        "isSticky": true,
+        "commands": [
+          { "name": "start", "description": "Démarrer une session Party Mode avec sélection d'agents" },
+          { "name": "all", "description": "Interroger tous les agents d'un coup" }
+        ]
+      },
+      {
+        "id": "bmad.orchestrator",
+        "fullName": "BMAD Orchestrator",
+        "name": "bmad-orchestrator",
+        "description": "Orchestrateur BMAD — coordination multi-agents, workflows, et guidance de rôle",
+        "isSticky": true,
+        "commands": [
+          { "name": "help", "description": "Afficher les commandes disponibles" },
+          { "name": "agent", "description": "Transformer en agent spécialisé" },
+          { "name": "workflow", "description": "Lancer un workflow" },
+          { "name": "task", "description": "Exécuter une tâche" }
+        ]
+      },
+      {
+        "id": "bmad.master",
+        "fullName": "BMAD Master",
+        "name": "bmad-master",
+        "description": "Expert universel BMAD — exécute toutes les tâches sans changer de persona",
+        "isSticky": true,
+        "commands": [
+          { "name": "help", "description": "Afficher les commandes disponibles" },
+          { "name": "task", "description": "Exécuter une tâche" },
+          { "name": "checklist", "description": "Lancer une checklist" }
+        ]
+      },
+      {
+        "id": "bmad.analyst",
+        "fullName": "BMAD Business Analyst",
+        "name": "bmad-analyst",
+        "description": "Analyste métier — recherche, analyse de marché, PRD"
+      },
+      {
+        "id": "bmad.architect",
+        "fullName": "BMAD Architect",
+        "name": "bmad-architect",
+        "description": "Architecte logiciel — conception technique, architecture, design patterns"
+      },
+      {
+        "id": "bmad.pm",
+        "fullName": "BMAD Project Manager",
+        "name": "bmad-pm",
+        "description": "Chef de projet — planification, épiques, user stories"
+      },
+      {
+        "id": "bmad.dev",
+        "fullName": "BMAD Developer",
+        "name": "bmad-dev",
+        "description": "Développeur senior — implémentation, code review, debugging"
+      },
+      {
+        "id": "bmad.qa",
+        "fullName": "BMAD QA Engineer",
+        "name": "bmad-qa",
+        "description": "Ingénieur QA — stratégie de test, couverture, validation qualité"
+      },
+      {
+        "id": "bmad.po",
+        "fullName": "BMAD Product Owner",
+        "name": "bmad-po",
+        "description": "Product Owner — backlog, user stories, critères d'acceptation"
+      },
+      {
+        "id": "bmad.sm",
+        "fullName": "BMAD Scrum Master",
+        "name": "bmad-sm",
+        "description": "Scrum Master — sprints, rituels agile, facilitation"
+      },
+      {
+        "id": "bmad.ux",
+        "fullName": "BMAD UX Expert",
+        "name": "bmad-ux",
+        "description": "Expert UX — wireframes, design système, accessibilité"
+      }
+    ],
+    "commands": [
+      {
+        "command": "bmad.launchGUI",
+        "title": "BMAD: Ouvrir l'application Electron",
+        "icon": "$(rocket)"
+      }
+    ]
+  }
+}

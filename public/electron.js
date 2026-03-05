@@ -11,6 +11,47 @@ let backend;
 
 const isDev = process.env.NODE_ENV === 'development';
 
+// ─── CLI argument parsing (--route /path) ───────────────────────────────────
+function getCliRoute() {
+  const idx = process.argv.indexOf('--route');
+  if (idx !== -1 && process.argv[idx + 1]) return process.argv[idx + 1];
+  return null;
+}
+
+/**
+ * Navigate the renderer to a given hash route.
+ * Works for both dev (localhost) and prod (file://) modes.
+ */
+function navigateToRoute(route) {
+  if (!mainWindow || !route) return;
+  // The React app uses HashRouter, so we send via IPC
+  mainWindow.webContents.send('navigate', route);
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+// ─── Single Instance Lock ───────────────────────────────────────────────────
+const gotLock = app.requestSingleInstanceLock();
+
+if (!gotLock) {
+  // Another instance is already running — it will receive our argv via
+  // 'second-instance' event. We can quit immediately.
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    // Parse --route from the second instance's arguments
+    const routeIdx = argv.indexOf('--route');
+    if (routeIdx !== -1 && argv[routeIdx + 1]) {
+      navigateToRoute(argv[routeIdx + 1]);
+    }
+    // Focus existing window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -427,6 +468,14 @@ app.whenReady().then(async () => {
   await initBackend();
   registerIpcHandlers();
   createWindow();
+
+  // Navigate to CLI --route after window is ready
+  const cliRoute = getCliRoute();
+  if (cliRoute) {
+    mainWindow.webContents.on('did-finish-load', () => {
+      navigateToRoute(cliRoute);
+    });
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
