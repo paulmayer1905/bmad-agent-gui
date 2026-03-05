@@ -318,6 +318,13 @@ export default function AgentChat() {
     const msg = input.trim();
     if (!msg || loading || !session) return;
 
+    // ── Client-side command interception (all agents) ──────────────────
+    if (msg === '*party-mode') {
+      setInput('');
+      navigate('/collaboration');
+      return;
+    }
+
     setInput('');
     setError(null);
 
@@ -1020,6 +1027,14 @@ export default function AgentChat() {
         )}
         <div className="chat-input-wrapper">
           <button
+            className="chat-party-btn"
+            onClick={() => navigate('/collaboration')}
+            disabled={loading}
+            title="Party Mode — Solliciter tous les agents"
+          >
+            🎊
+          </button>
+          <button
             className="chat-upload-btn"
             onClick={handleUploadFile}
             disabled={loading || uploading}
@@ -1047,7 +1062,7 @@ export default function AgentChat() {
           </button>
         </div>
         <div className="chat-input-hint">
-          Entrée pour envoyer · Shift+Entrée pour un retour à la ligne · 📎 pour joindre un fichier (SVG Figma, PDF, code...)
+          Entrée pour envoyer · Shift+Entrée pour un retour à la ligne · 📎 fichier · 🎊 party mode · <code>*party-mode</code> pour collaborer
         </div>
       </div>
     </div>
