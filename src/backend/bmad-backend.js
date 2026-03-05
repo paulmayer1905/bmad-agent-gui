@@ -406,7 +406,40 @@ class BMADBackend {
     }
     const filePath = path.join(this.coreRoot, 'checklists', `${name}.md`);
     const content = await fs.readFile(filePath, 'utf8');
-    return { name, rawContent: content };
+    return { name, rawContent: content, content };
+  }
+
+  // ─── Templates ──────────────────────────────────────────────────────────
+  async listTemplates() {
+    try {
+      const dir = path.join(this.coreRoot, 'templates');
+      const files = await fs.readdir(dir);
+      const templates = [];
+      for (const file of files.filter(f => f.endsWith('.yaml') || f.endsWith('.yml') || f.endsWith('.md'))) {
+        const ext = path.extname(file);
+        templates.push({
+          name: file.replace(ext, ''),
+          filename: file,
+          id: file.replace(ext, '')
+        });
+      }
+      return templates;
+    } catch {
+      return [];
+    }
+  }
+
+  async getTemplate(name) {
+    const dir = path.join(this.coreRoot, 'templates');
+    // Try common extensions
+    for (const ext of ['.yaml', '.yml', '.md']) {
+      try {
+        const filePath = path.join(dir, name.endsWith(ext) ? name : `${name}${ext}`);
+        const content = await fs.readFile(filePath, 'utf8');
+        return { name, content };
+      } catch { /* try next extension */ }
+    }
+    throw new Error(`Template ${name} not found`);
   }
 
   // ─── Tasks ──────────────────────────────────────────────────────────────
@@ -483,7 +516,29 @@ class BMADBackend {
   }
 
   async sendChatMessage(sessionId, message) {
+    // ── * command preprocessing for meta-agents (bmad-master, bmad-orchestrator) ──
+    const agentName = this._extractAgentName(sessionId);
+    if (agentName && this._coordinator) {
+      const { message: enriched, metadata } = await this._coordinator.preprocessCommand(agentName, message);
+      const result = await this._aiService.sendMessage(sessionId, enriched);
+      // Attach metadata for frontend (e.g. navigation hint, switch-agent)
+      if (metadata) result._cmdMeta = metadata;
+      return result;
+    }
     return await this._aiService.sendMessage(sessionId, message);
+  }
+
+  /**
+   * Extract the agent name from a session ID (format: chat-{agentName}-{ts}).
+   * Returns null for non-chat sessions or unrecognizable IDs.
+   */
+  _extractAgentName(sessionId) {
+    if (!sessionId || !sessionId.startsWith('chat-')) return null;
+    // chat-{agent}-{timestamp}  →  remove 'chat-' prefix and trailing '-{digits}'
+    const withoutPrefix = sessionId.slice(5); // remove 'chat-'
+    const lastDash = withoutPrefix.lastIndexOf('-');
+    if (lastDash <= 0) return null;
+    return withoutPrefix.slice(0, lastDash);
   }
 
   async streamChatMessage(sessionId, message, onChunk) {

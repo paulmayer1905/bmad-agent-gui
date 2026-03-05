@@ -41,6 +41,8 @@ function createMockBackend() {
     pm: { rawContent: '# PM Agent\nRole: Product Manager' },
     qa: { rawContent: '# QA Agent\nRole: QA Engineer' },
     'ux-expert': { rawContent: '# UX Expert Agent\nRole: UX Designer' },
+    'bmad-orchestrator': { rawContent: '# BMad Orchestrator\nRole: Master Orchestrator' },
+    'bmad-master': { rawContent: '# BMad Master\nRole: Master Task Executor' },
   };
 
   const metadata = {
@@ -50,6 +52,8 @@ function createMockBackend() {
     pm: { name: 'pm', title: 'Product Manager', icon: '📋' },
     qa: { name: 'qa', title: 'QA Engineer', icon: '🧪' },
     'ux-expert': { name: 'ux-expert', title: 'UX Expert', icon: '🎨' },
+    'bmad-orchestrator': { name: 'bmad-orchestrator', title: 'BMad Master Orchestrator', icon: '🎭' },
+    'bmad-master': { name: 'bmad-master', title: 'BMad Master Task Executor', icon: '🧙' },
   };
 
   return {
@@ -472,10 +476,11 @@ describe('AgentCoordinator', () => {
       const session = coordinator.partySessions.get(party.partyId);
 
       // Test @mention routing
-      const targets = await coordinator._routeMessage(session, '@architect peux-tu vérifier ?');
+      const result = await coordinator._routeMessage(session, '@architect peux-tu vérifier ?');
 
-      expect(targets).toHaveLength(1);
-      expect(targets[0].name).toBe('architect');
+      expect(result.agents).toHaveLength(1);
+      expect(result.agents[0].name).toBe('architect');
+      expect(result.routingMsg).toBeNull();
     });
 
     test('_routeMessage should fallback to LLM routing when no @mention', async () => {
@@ -488,10 +493,10 @@ describe('AgentCoordinator', () => {
         usage: {}
       });
 
-      const targets = await coordinator._routeMessage(session, 'Quels sont les besoins ?');
+      const result = await coordinator._routeMessage(session, 'Quels sont les besoins ?');
 
       // Should have called sendMessage for routing
-      expect(targets.length).toBeGreaterThanOrEqual(1);
+      expect(result.agents.length).toBeGreaterThanOrEqual(1);
     });
 
     test('_routeMessage should fallback to first agent on LLM error', async () => {
@@ -500,11 +505,11 @@ describe('AgentCoordinator', () => {
 
       mockAIService.sendMessage.mockRejectedValueOnce(new Error('LLM down'));
 
-      const targets = await coordinator._routeMessage(session, 'Some question');
+      const result = await coordinator._routeMessage(session, 'Some question');
 
       // Should fallback to first agent
-      expect(targets).toHaveLength(1);
-      expect(targets[0].name).toBe('dev');
+      expect(result.agents).toHaveLength(1);
+      expect(result.agents[0].name).toBe('dev');
     });
 
     test('sendPartyMessage should handle agent error gracefully', async () => {
@@ -1106,6 +1111,164 @@ describe('AgentCoordinator', () => {
           expect(step.instructions.length).toBeGreaterThan(10);
         }
       }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  Orchestrator Party Routing & * Command Preprocessing
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('Orchestrator Party Routing', () => {
+    test('startParty with orchestrator shows orchestrator-specific greeting', async () => {
+      const result = await coordinator.startParty(['bmad-orchestrator', 'dev', 'qa']);
+
+      expect(result.greeting).toContain('BMad Orchestrator');
+      expect(result.greeting).toContain('je dirigerai');
+      // Orchestrator is not listed as specialist
+      expect(result.greeting).not.toContain('BMad Master Orchestrator');
+    });
+
+    test('startParty without orchestrator shows generic greeting', async () => {
+      const result = await coordinator.startParty(['dev', 'qa']);
+
+      expect(result.greeting).toContain('Mode Collaboration activé');
+    });
+
+    test('_routeMessage with orchestrator uses orchestrator routing', async () => {
+      mockBackend.getAgent.mockImplementation(async (name) => {
+        return { rawContent: `# ${name} definition` };
+      });
+      mockBackend.getAgentMetadata.mockImplementation(async (name) => {
+        const titles = { 'bmad-orchestrator': 'BMad Orchestrator', 'dev': 'Developer', 'qa': 'QA' };
+        return { name, title: titles[name] || name, icon: '🤖' };
+      });
+
+      const party = await coordinator.startParty(['bmad-orchestrator', 'dev', 'qa']);
+      const session = coordinator.partySessions.get(party.partyId);
+
+      // Mock orchestrator returning routing JSON
+      mockAIService.sendMessage.mockResolvedValueOnce({
+        content: '{"agents": ["dev"], "reason": "Question de code"}',
+        usage: {}
+      });
+
+      const result = await coordinator._routeMessage(session, 'Comment structurer ce module ?');
+
+      expect(result.agents).toHaveLength(1);
+      expect(result.agents[0].name).toBe('dev');
+      // Orchestrator produces a visible routing message
+      expect(result.routingMsg).not.toBeNull();
+      expect(result.routingMsg.agent).toBe('bmad-orchestrator');
+      expect(result.routingMsg.isRouting).toBe(true);
+      expect(result.routingMsg.content).toContain('Question de code');
+    });
+
+    test('sendPartyMessage includes orchestrator routing msg in responses', async () => {
+      mockBackend.getAgent.mockImplementation(async (name) => {
+        return { rawContent: `# ${name}` };
+      });
+      mockBackend.getAgentMetadata.mockImplementation(async (name) => {
+        const m = { 'bmad-orchestrator': { title: 'BMad Orchestrator', icon: '🎭' }, 'dev': { title: 'Dev', icon: '💻' } };
+        return { name, ...(m[name] || { title: name, icon: '🤖' }) };
+      });
+
+      const party = await coordinator.startParty(['bmad-orchestrator', 'dev']);
+
+      // First sendMessage = orchestrator routing, second = dev response
+      mockAIService.sendMessage
+        .mockResolvedValueOnce({ content: '{"agents": ["dev"], "reason": "Code question"}', usage: {} })
+        .mockResolvedValueOnce({ content: 'Dev response here', usage: {} });
+
+      const result = await coordinator.sendPartyMessage(party.partyId, 'Write some code');
+
+      // Should have 2 responses: routing msg + dev answer
+      expect(result.responses.length).toBe(2);
+      expect(result.responses[0].isRouting).toBe(true);
+      expect(result.responses[0].agent).toBe('bmad-orchestrator');
+      expect(result.responses[1].agent).toBe('dev');
+    });
+  });
+
+  describe('* Command Preprocessing', () => {
+    test('preprocessCommand returns unmodified message for non-meta agents', async () => {
+      const { message, metadata } = await coordinator.preprocessCommand('dev', '*help');
+      expect(message).toBe('*help');
+      expect(metadata).toBeNull();
+    });
+
+    test('preprocessCommand passes through non-command messages for meta agents', async () => {
+      const { message, metadata } = await coordinator.preprocessCommand('bmad-master', 'Tell me about architecture');
+      expect(message).toBe('Tell me about architecture');
+      expect(metadata).toBeNull();
+    });
+
+    test('*party-mode returns navigation metadata', async () => {
+      const { metadata } = await coordinator.preprocessCommand('bmad-orchestrator', '*party-mode');
+      expect(metadata).toEqual({ action: 'navigate', target: '/collaboration' });
+    });
+
+    test('*task without arg lists available tasks', async () => {
+      mockBackend.listTasks = jest.fn(async () => [
+        { name: 'create-doc', filename: 'create-doc.md', title: 'Create Document' },
+        { name: 'shard-doc', filename: 'shard-doc.md', title: 'Shard Document' }
+      ]);
+
+      const { message, metadata } = await coordinator.preprocessCommand('bmad-master', '*task');
+      expect(message).toContain('create-doc');
+      expect(message).toContain('shard-doc');
+      expect(metadata.action).toBe('list-tasks');
+      expect(metadata.items).toHaveLength(2);
+    });
+
+    test('*task with arg loads and injects task content', async () => {
+      mockBackend.listTasks = jest.fn(async () => [
+        { name: 'create-doc', id: 'create-doc' }
+      ]);
+      mockBackend.getTask = jest.fn(async () => ({ content: '# Create Doc\nStep 1: ...' }));
+
+      const { message, metadata } = await coordinator.preprocessCommand('bmad-master', '*task create-doc');
+      expect(message).toContain('TASK START');
+      expect(message).toContain('Step 1');
+      expect(metadata.action).toBe('execute-task');
+      expect(metadata.task).toBe('create-doc');
+    });
+
+    test('*workflow without arg lists pipeline templates', async () => {
+      const { message, metadata } = await coordinator.preprocessCommand('bmad-orchestrator', '*workflow');
+      expect(metadata.action).toBe('list-workflows');
+      expect(metadata.items.length).toBeGreaterThanOrEqual(6);
+    });
+
+    test('*agent without arg lists agents', async () => {
+      mockBackend.listAgents = jest.fn(async () => [
+        { name: 'dev', title: 'Developer', icon: '💻' },
+        { name: 'qa', title: 'QA Engineer', icon: '🧪' }
+      ]);
+
+      const { message, metadata } = await coordinator.preprocessCommand('bmad-orchestrator', '*agent');
+      expect(metadata.action).toBe('list-agents');
+      expect(metadata.items).toHaveLength(2);
+    });
+
+    test('*agent with name returns switch-agent metadata', async () => {
+      mockBackend.listAgents = jest.fn(async () => [
+        { name: 'architect', title: 'Software Architect', icon: '🏗️' }
+      ]);
+
+      const { metadata } = await coordinator.preprocessCommand('bmad-orchestrator', '*agent architect');
+      expect(metadata.action).toBe('switch-agent');
+      expect(metadata.agent).toBe('architect');
+    });
+
+    test('*checklist without arg lists checklists', async () => {
+      mockBackend.listChecklists = jest.fn(async () => [
+        { name: 'pm-checklist', title: 'PM Checklist' },
+        { name: 'architect-checklist', title: 'Architect Checklist' }
+      ]);
+
+      const { message, metadata } = await coordinator.preprocessCommand('bmad-master', '*checklist');
+      expect(metadata.action).toBe('list-checklists');
+      expect(metadata.items).toHaveLength(2);
     });
   });
 });

@@ -341,6 +341,15 @@ export default function AgentChat() {
           timestamp: Date.now(),
           usage: result.usage
         }]);
+        // Handle * command metadata from meta-agents (bmad-master, bmad-orchestrator)
+        if (result._cmdMeta) {
+          const meta = result._cmdMeta;
+          if (meta.action === 'navigate' && meta.target) {
+            setTimeout(() => navigate(meta.target), 500);
+          } else if (meta.action === 'switch-agent' && meta.agent) {
+            setTimeout(() => navigate(`/agent/${meta.agent}`), 800);
+          }
+        }
       } catch (err) {
         setError(err.message || 'Erreur lors de l\'envoi');
       } finally {

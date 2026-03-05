@@ -714,6 +714,23 @@ const FIX_AND_FINALIZE_INSTRUCTIONS = `Revois le code généré et les retours d
 |----|-------|--------|
 | US-X.X | ... | ✅ Implémentée |`;
 
+// ─── Shared agent description map (routing & display) ─────────────────
+const AGENT_DESCRIPTIONS = {
+  'analyst':          'Analyse des besoins, étude de marché, brainstorming, identification des fonctionnalités',
+  'pm':               'Rédaction du PRD, épics et user stories, product strategy, roadmap',
+  'po':               'Backlog priorisé, validation des user stories, critères d\'acceptation, sprint planning',
+  'architect':        'Architecture technique, choix de stack, structure du projet, conception système',
+  'ux-expert':        'Design UX/UI, wireframes, maquettes SVG, parcours utilisateur',
+  'dev':              'Développement, code, implémentation, debugging, refactoring',
+  'qa':               'Tests, qualité, revue de code, validation, bugs',
+  'sm':               'Scrum, sprints, rétrospective, agilité, facilitation',
+  'bmad-master':      'Exécution de tâches, templates, checklists — expertise universelle BMad',
+  'bmad-orchestrator': 'Orchestration multi-agent, coordination de workflows, routage intelligent',
+};
+
+// ─── Meta-agent names (support * commands) ────────────────────────────
+const META_AGENTS = new Set(['bmad-master', 'bmad-orchestrator']);
+
 class AgentCoordinator extends EventEmitter {
   constructor(options = {}) {
     super();
@@ -742,6 +759,199 @@ class AgentCoordinator extends EventEmitter {
    */
   _instr(taskId, fallback) {
     return this._pipelineInstructions[taskId] || fallback;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  * COMMAND PREPROCESSING (bmad-master & bmad-orchestrator)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Preprocess a user message for meta-agents (bmad-master, bmad-orchestrator).
+   * Detects *command patterns and loads referenced resources from bmad-core so
+   * the LLM can execute them with full context.
+   *
+   * @param {string} agentName - e.g. 'bmad-master'
+   * @param {string} userMessage - raw user input
+   * @returns {{ message: string, metadata: Object|null }}
+   *   - message: the (possibly enriched) message to send to the LLM
+   *   - metadata: optional structured result for the frontend (e.g. navigation hint)
+   */
+  async preprocessCommand(agentName, userMessage) {
+    if (!META_AGENTS.has(agentName)) {
+      return { message: userMessage, metadata: null };
+    }
+
+    const cmdMatch = userMessage.trim().match(/^\*(\w[\w-]*)\s*(.*)?$/);
+    if (!cmdMatch) return { message: userMessage, metadata: null };
+
+    const command = cmdMatch[1].toLowerCase();
+    const arg = (cmdMatch[2] || '').trim();
+
+    switch (command) {
+      case 'task':
+        return this._cmdTask(agentName, arg);
+      case 'create-doc':
+        return this._cmdCreateDoc(agentName, arg);
+      case 'execute-checklist':
+      case 'checklist':
+        return this._cmdChecklist(agentName, arg);
+      case 'workflow':
+        return this._cmdWorkflow(agentName, arg);
+      case 'agent':
+        return this._cmdAgent(agentName, arg);
+      case 'party-mode':
+        return { message: userMessage, metadata: { action: 'navigate', target: '/collaboration' } };
+      // help, kb, kb-mode, status, yolo, exit → let LLM handle via persona
+      default:
+        return { message: userMessage, metadata: null };
+    }
+  }
+
+  /** *task [name] — load a task file and inject it */
+  async _cmdTask(agentName, arg) {
+    try {
+      const tasks = await this.bmadBackend.listTasks();
+      if (!arg) {
+        const list = tasks.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
+        return {
+          message: `L'utilisateur a tapé *task. Voici les tâches disponibles, présente-les en liste numérotée :\n${list}`,
+          metadata: { action: 'list-tasks', items: tasks }
+        };
+      }
+      // Fuzzy match the task name
+      const match = tasks.find(t =>
+        t.name.toLowerCase().includes(arg.toLowerCase()) ||
+        t.id?.toLowerCase().includes(arg.toLowerCase())
+      );
+      if (!match) {
+        return { message: `L'utilisateur a demandé *task ${arg} mais cette tâche n'existe pas. Voici les tâches disponibles : ${tasks.map(t => t.name).join(', ')}`, metadata: null };
+      }
+      const taskContent = await this.bmadBackend.getTask(match.name || match.id);
+      return {
+        message: `L'utilisateur demande d'exécuter la tâche "${match.name}". Voici le contenu complet de cette tâche — suis les instructions exactement :\n\n--- TASK START ---\n${taskContent.content || taskContent}\n--- TASK END ---`,
+        metadata: { action: 'execute-task', task: match.name }
+      };
+    } catch {
+      return { message: `*task ${arg}`, metadata: null };
+    }
+  }
+
+  /** *create-doc [template] — load create-doc task + a template */
+  async _cmdCreateDoc(agentName, arg) {
+    try {
+      const templates = await this.bmadBackend.listTemplates();
+      if (!arg) {
+        const list = templates.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
+        return {
+          message: `L'utilisateur a tapé *create-doc. Voici les templates disponibles, présente-les en liste numérotée :\n${list}`,
+          metadata: { action: 'list-templates', items: templates }
+        };
+      }
+      const match = templates.find(t =>
+        t.name.toLowerCase().includes(arg.toLowerCase()) ||
+        t.id?.toLowerCase().includes(arg.toLowerCase())
+      );
+      if (!match) {
+        return { message: `Template "${arg}" introuvable. Templates disponibles : ${templates.map(t => t.name).join(', ')}`, metadata: null };
+      }
+      // Load the create-doc task + the selected template
+      let taskContent = '';
+      try {
+        const task = await this.bmadBackend.getTask('create-doc');
+        taskContent = task.content || task;
+      } catch { /* task may not exist */ }
+      const tmplContent = await this.bmadBackend.getTemplate(match.name || match.id);
+      return {
+        message: `L'utilisateur demande de créer un document avec le template "${match.name}".${taskContent ? `\n\n--- TASK: create-doc ---\n${taskContent}\n--- FIN TASK ---` : ''}\n\n--- TEMPLATE ---\n${tmplContent.content || tmplContent}\n--- FIN TEMPLATE ---\n\nSuis les instructions de la tâche create-doc en utilisant ce template.`,
+        metadata: { action: 'create-doc', template: match.name }
+      };
+    } catch {
+      return { message: `*create-doc ${arg}`, metadata: null };
+    }
+  }
+
+  /** *execute-checklist [name] — load a checklist */
+  async _cmdChecklist(agentName, arg) {
+    try {
+      const checklists = await this.bmadBackend.listChecklists();
+      if (!arg) {
+        const list = checklists.map((c, i) => `${i + 1}. ${c.name}`).join('\n');
+        return {
+          message: `L'utilisateur a tapé *execute-checklist. Voici les checklists disponibles :\n${list}`,
+          metadata: { action: 'list-checklists', items: checklists }
+        };
+      }
+      const match = checklists.find(c =>
+        c.name.toLowerCase().includes(arg.toLowerCase()) ||
+        c.id?.toLowerCase().includes(arg.toLowerCase())
+      );
+      if (!match) {
+        return { message: `Checklist "${arg}" introuvable. Checklists disponibles : ${checklists.map(c => c.name).join(', ')}`, metadata: null };
+      }
+      // Load execute-checklist task + the checklist itself
+      let taskContent = '';
+      try {
+        const task = await this.bmadBackend.getTask('execute-checklist');
+        taskContent = task.content || task;
+      } catch { /* task may not exist */ }
+      const checkContent = await this.bmadBackend.getChecklist(match.name || match.id);
+      return {
+        message: `L'utilisateur demande d'exécuter la checklist "${match.name}".${taskContent ? `\n\n--- TASK: execute-checklist ---\n${taskContent}\n--- FIN TASK ---` : ''}\n\n--- CHECKLIST ---\n${checkContent.content || checkContent}\n--- FIN CHECKLIST ---\n\nExécute cette checklist point par point.`,
+        metadata: { action: 'execute-checklist', checklist: match.name }
+      };
+    } catch {
+      return { message: `*execute-checklist ${arg}`, metadata: null };
+    }
+  }
+
+  /** *workflow [name] — list or describe available pipeline workflows */
+  async _cmdWorkflow(agentName, arg) {
+    const templates = this.getPipelineTemplates();
+    if (!arg) {
+      const list = templates.map((t, i) => `${i + 1}. **${t.name}** — ${t.description}`).join('\n');
+      return {
+        message: `L'utilisateur a tapé *workflow. Voici les workflows/pipelines disponibles, présente-les :\n${list}`,
+        metadata: { action: 'list-workflows', items: templates.map(t => ({ id: t.id, name: t.name, description: t.description })) }
+      };
+    }
+    const match = templates.find(t =>
+      t.id.toLowerCase().includes(arg.toLowerCase()) ||
+      t.name.toLowerCase().includes(arg.toLowerCase())
+    );
+    if (!match) {
+      return { message: `Workflow "${arg}" introuvable. Disponibles : ${templates.map(t => t.name).join(', ')}`, metadata: null };
+    }
+    return {
+      message: `L'utilisateur demande le workflow "${match.name}". Décris les étapes de ce pipeline et demande confirmation pour le lancer.`,
+      metadata: { action: 'suggest-workflow', workflow: match }
+    };
+  }
+
+  /** *agent [name] — suggest switching to another agent (orchestrator only) */
+  async _cmdAgent(agentName, arg) {
+    try {
+      const agents = await this.bmadBackend.listAgents();
+      if (!arg) {
+        const list = agents.map((a, i) => `${i + 1}. ${a.icon || '🤖'} **${a.title || a.name}** — ${AGENT_DESCRIPTIONS[a.name] || ''}`).join('\n');
+        return {
+          message: `L'utilisateur a tapé *agent. Voici les agents spécialistes disponibles :\n${list}\n\nDemande à l'utilisateur lequel il souhaite consulter.`,
+          metadata: { action: 'list-agents', items: agents }
+        };
+      }
+      const match = agents.find(a =>
+        a.name.toLowerCase().includes(arg.toLowerCase()) ||
+        (a.title || '').toLowerCase().includes(arg.toLowerCase())
+      );
+      if (match) {
+        return {
+          message: `L'utilisateur souhaite passer à l'agent ${match.icon || '🤖'} ${match.title || match.name}. Annonce la transition et suggère de démarrer un nouveau chat avec cet agent.`,
+          metadata: { action: 'switch-agent', agent: match.name, agentTitle: match.title, agentIcon: match.icon }
+        };
+      }
+      return { message: `Agent "${arg}" introuvable. Agents disponibles : ${agents.map(a => a.name).join(', ')}`, metadata: null };
+    } catch {
+      return { message: `*agent ${arg}`, metadata: null };
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -1327,15 +1537,24 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
       status: 'active'
     };
 
-    // Greeting message
-    const greeting = `🎉 **Mode Collaboration activé !**\n\nAgents présents :\n${agents.map(a => `${a.icon} **${a.title}**`).join('\n')}\n\nPosez votre question ou décrivez votre besoin. L'agent le plus pertinent répondra.\nUtilisez @nom pour cibler un agent spécifique (ex: @architect, @qa).`;
+    // Greeting — when the orchestrator is present, it introduces itself as the coordinator
+    const orchestrator = agents.find(a => a.name === 'bmad-orchestrator');
+    const specialists = agents.filter(a => a.name !== 'bmad-orchestrator');
+    const agentListStr = (orchestrator ? specialists : agents).map(a => `${a.icon} **${a.title}**`).join('\n');
+
+    let greeting;
+    if (orchestrator) {
+      greeting = `🎭 **BMad Orchestrator — Mode Collaboration**\n\nJe coordonne cette session. Agents spécialistes :\n${agentListStr}\n\nDécrivez votre besoin — je dirigerai automatiquement vers l'expert le plus pertinent.\nUtilisez @nom pour cibler un agent (ex: @architect, @qa).`;
+    } else {
+      greeting = `🎉 **Mode Collaboration activé !**\n\nAgents présents :\n${agentListStr}\n\nPosez votre question ou décrivez votre besoin. L'agent le plus pertinent répondra.\nUtilisez @nom pour cibler un agent spécifique (ex: @architect, @qa).`;
+    }
 
     session.messages.push({
       id: `msg-${Date.now()}`,
       role: 'system',
-      agent: 'coordinator',
-      agentIcon: '🎭',
-      agentTitle: 'Coordinateur',
+      agent: orchestrator ? 'bmad-orchestrator' : 'coordinator',
+      agentIcon: orchestrator ? orchestrator.icon : '🎭',
+      agentTitle: orchestrator ? orchestrator.title : 'Coordinateur',
       content: greeting,
       timestamp: Date.now()
     });
@@ -1370,6 +1589,7 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
 
     // Determine which agent(s) should respond
     let targetAgents;
+    let routingMsg = null;
 
     if (options.targetAgent) {
       // User explicitly mentioned an agent
@@ -1381,10 +1601,18 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
     }
 
     if (!targetAgents || targetAgents.length === 0) {
-      targetAgents = await this._routeMessage(session, userMessage);
+      const routeResult = await this._routeMessage(session, userMessage);
+      targetAgents = routeResult.agents;
+      routingMsg = routeResult.routingMsg || null;
     }
 
     const responses = [];
+
+    // If orchestrator produced a visible routing message, include it first
+    if (routingMsg) {
+      session.messages.push(routingMsg);
+      responses.push(routingMsg);
+    }
 
     for (const agent of targetAgents) {
       try {
@@ -1430,7 +1658,9 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
   }
 
   /**
-   * Route a message to the most relevant agent(s) using LLM-based routing.
+   * Route a message to the most relevant agent(s).
+   * When bmad-orchestrator is in the party, it acts as the visible coordinator.
+   * @returns {{ agents: Object[], routingMsg: Object|null }}
    */
   async _routeMessage(session, message) {
     // Fast rule-based routing: check for @mentions
@@ -1441,24 +1671,95 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
         a.name.toLowerCase().includes(mentioned) ||
         a.title.toLowerCase().includes(mentioned)
       );
-      if (found) return [found];
+      if (found) return { agents: [found], routingMsg: null };
     }
 
-    // LLM-based routing
-    const agentDescriptions = {
-      'analyst': 'Analyse des besoins, étude de marché, brainstorming, identification des fonctionnalités',
-      'pm': 'Rédaction du PRD, épics et user stories, product strategy, roadmap',
-      'po': 'Backlog priorisé, validation des user stories, critères d\'acceptation, sprint planning',
-      'architect': 'Architecture technique, choix de stack, structure du projet, conception système',
-      'ux-expert': 'Design UX/UI, wireframes, maquettes SVG, parcours utilisateur',
-      'dev': 'Développement, code, implémentation, debugging, refactoring',
-      'qa': 'Tests, qualité, revue de code, validation, bugs',
-      'sm': 'Scrum, sprints, rétrospective, agilité, facilitation',
-      'bmad-master': 'Aide BMAD, workflows, méthodologie',
-      'bmad-orchestrator': 'Orchestration globale, coordination multi-agent',
-    };
+    // ── Orchestrator-powered routing ──────────────────────────────────
+    const orchestrator = session.agents.find(a => a.name === 'bmad-orchestrator');
+    if (orchestrator) {
+      return this._orchestratorRoute(session, orchestrator, message);
+    }
+
+    // ── Generic LLM-based routing (no orchestrator present) ───────────
+    return this._genericRoute(session, message);
+  }
+
+  /**
+   * Orchestrator-powered party routing.
+   * The orchestrator analyses the message, picks the best agent(s), and
+   * produces a visible routing message explaining its choice.
+   */
+  async _orchestratorRoute(session, orchestrator, message) {
+    const specialists = session.agents.filter(a => a.name !== 'bmad-orchestrator');
+    const agentList = specialists.map(a => {
+      const desc = AGENT_DESCRIPTIONS[a.name] || a.title;
+      return `- ${a.name} (${a.title}): ${desc}`;
+    }).join('\n');
+
+    const routingPrompt = `Tu es le BMad Orchestrator et tu coordonnes cette équipe d'agents.
+
+Agents spécialistes disponibles :
+${agentList}
+
+Message de l'utilisateur :
+"${message}"
+
+Analyse le message et détermine quel(s) agent(s) spécialiste(s) doi(ven)t répondre.
+
+RÉPONDS EXACTEMENT dans ce format JSON (rien d'autre) :
+{"agents": ["nom-agent"], "reason": "Explication courte de ton choix de routage (1 phrase)"}
+
+Maximum 2 agents. Ne te désigne jamais toi-même.`;
+
+    try {
+      const subSessionId = `orch-route-${Date.now()}`;
+      this.aiService.conversations.set(subSessionId, {
+        systemPrompt: this.aiService.buildSystemPrompt(orchestrator.definition, orchestrator.title),
+        agentName: orchestrator.title,
+        messages: [],
+        createdAt: Date.now()
+      });
+
+      const result = await this.aiService.sendMessage(subSessionId, routingPrompt);
+      this.aiService.conversations.delete(subSessionId);
+
+      // Parse JSON from response
+      const jsonMatch = result.content.match(/\{[\s\S]*?\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        const matchedAgents = specialists.filter(a =>
+          (parsed.agents || []).some(n => a.name === n)
+        );
+
+        if (matchedAgents.length > 0) {
+          const reason = parsed.reason || 'Routage automatique';
+          const targetNames = matchedAgents.map(a => `${a.icon} **${a.title}**`).join(' & ');
+          const routingMsg = {
+            id: `msg-${Date.now()}-orch`,
+            role: 'assistant',
+            agent: 'bmad-orchestrator',
+            agentIcon: orchestrator.icon,
+            agentTitle: orchestrator.title,
+            content: `🎯 ${reason}\n\n→ ${targetNames}`,
+            isRouting: true,
+            timestamp: Date.now()
+          };
+          return { agents: matchedAgents.slice(0, 2), routingMsg };
+        }
+      }
+    } catch {
+      // Fallback to generic routing on parse/LLM error
+    }
+
+    return this._genericRoute(session, message);
+  }
+
+  /**
+   * Generic LLM-based routing (when orchestrator is absent or fails).
+   */
+  async _genericRoute(session, message) {
     const agentList = session.agents.map(a => {
-      const desc = agentDescriptions[a.name] || a.title;
+      const desc = AGENT_DESCRIPTIONS[a.name] || a.title;
       return `- ${a.name} (${a.title}): ${desc}`;
     }).join('\n');
     const routingPrompt = `Tu es un coordinateur d'équipe. Voici les agents disponibles et leurs domaines :
@@ -1495,13 +1796,13 @@ Réponds UNIQUEMENT avec le nom (name) de l'agent le plus pertinent. Si 2 agents
         responseText.includes(a.name.toLowerCase())
       );
 
-      if (matchedAgents.length > 0) return matchedAgents.slice(0, 2);
+      if (matchedAgents.length > 0) return { agents: matchedAgents.slice(0, 2), routingMsg: null };
     } catch {
       // Fallback on error
     }
 
     // Fallback: first agent in list
-    return [session.agents[0]];
+    return { agents: [session.agents[0]], routingMsg: null };
   }
 
   _buildPartyContext(session, currentAgentName) {

@@ -383,10 +383,11 @@ describe('AgentCoordinator — Pipeline Templates & Instructions (new features)'
       // Clear the initial greeting calls
       mockAIService.sendMessage.mockClear();
 
-      const targets = await coordinator._routeMessage(session, '@qa peux-tu vérifier ?');
+      const result = await coordinator._routeMessage(session, '@qa peux-tu vérifier ?');
 
-      expect(targets).toHaveLength(1);
-      expect(targets[0].name).toBe('qa');
+      expect(result.agents).toHaveLength(1);
+      expect(result.agents[0].name).toBe('qa');
+      expect(result.routingMsg).toBeNull();
       // Should NOT have called sendMessage for routing
       expect(mockAIService.sendMessage).not.toHaveBeenCalled();
     });
