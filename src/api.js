@@ -264,6 +264,22 @@ const api = {
       if (isElectron) return window.bmadAPI.coord.onPipelineStepError(callback);
       return () => {};
     },
+    onPipelineReviewStart: (callback) => {
+      if (isElectron) return window.bmadAPI.coord.onPipelineReviewStart(callback);
+      return () => {};
+    },
+    onPipelineReviewChallenge: (callback) => {
+      if (isElectron) return window.bmadAPI.coord.onPipelineReviewChallenge(callback);
+      return () => {};
+    },
+    onPipelineReviewRevision: (callback) => {
+      if (isElectron) return window.bmadAPI.coord.onPipelineReviewRevision(callback);
+      return () => {};
+    },
+    onPipelineReviewAccepted: (callback) => {
+      if (isElectron) return window.bmadAPI.coord.onPipelineReviewAccepted(callback);
+      return () => {};
+    },
     startParty: async (agentNames) => {
       if (isElectron) return window.bmadAPI.coord.startParty(agentNames);
       return { partyId: 'mock', agents: [], greeting: 'Mode navigateur', messageCount: 0 };

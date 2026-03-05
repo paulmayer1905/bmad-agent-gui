@@ -860,18 +860,37 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
             artifactType: step.artifactType || 'document'
           });
 
+          // ── Peer review (bidirectional challenge/revision) ──────────
+          let finalResult = result;
+          if (step.peerReview && step.peerReview.reviewer) {
+            finalResult = await this._runPeerReview({
+              step, primaryResult: result, state, pipelineId, stepIndex: i
+            });
+            // Persist the final revised version as artifact
+            if (step.saveArtifact !== false && finalResult !== result) {
+              await this.projectContext.addArtifact({
+                type: step.artifactType || 'document',
+                title: `[Révisé] ${step.task || step.agent}`,
+                content: finalResult.response,
+                summary: finalResult.response.slice(0, 200),
+                agent: step.agent,
+                tags: ['peer-reviewed', step.agent, step.peerReview.reviewer]
+              }).catch(() => {});
+            }
+          }
+
           step.status = 'completed';
           step.completedAt = Date.now();
-          step.result = result;
-          state.results.push(result);
-          previousOutput = result.response;
+          step.result = finalResult;
+          state.results.push(finalResult);
+          previousOutput = finalResult.response;
 
           // Extract code blocks and write to workspace if step has extractCode
           let filesWritten = [];
           if (step.extractCode && state.workspaceId && this.workspaceManager) {
             try {
               const writeResult = await this.workspaceManager.writeCodeBlocks(
-                state.workspaceId, result.response, { agent: step.agent }
+                state.workspaceId, finalResult.response, { agent: step.agent }
               );
               filesWritten = writeResult.written;
               this.emit('pipeline:files:written', {
@@ -884,9 +903,10 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
 
           this.emit('pipeline:step:done', {
             pipelineId, stepIndex: i, agentName: step.agent,
-            response: result.response.slice(0, 300),
-            usage: result.usage,
-            filesWritten: filesWritten.length
+            response: finalResult.response.slice(0, 300),
+            usage: finalResult.usage,
+            filesWritten: filesWritten.length,
+            reviewRounds: finalResult.peerReviewRounds?.length || 0
           });
 
         } catch (err) {
@@ -917,6 +937,147 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
     }
 
     return state;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  PEER REVIEW — bidirectional agent-to-agent challenge/revision loop
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Run a peer review loop between the primary agent and a reviewer agent.
+   *
+   * Flow:
+   *  1. Reviewer reads primary output → produces CRITIQUE or "VALIDÉ: reason"
+   *  2. If "VALIDÉ" → accept immediately
+   *  3. Else primary agent reads critique → produces REVISED output
+   *  4. Repeat up to maxRounds
+   *  5. Return final result (possibly revised)
+   *
+   * @param {Object} opts
+   *  - step         : the pipeline step definition (includes step.peerReview config)
+   *  - primaryResult: delegation result from the primary agent
+   *  - state        : current pipeline state (for context)
+   *  - pipelineId
+   *  - stepIndex
+   * @returns {Object} final delegation result (may be revised version of primaryResult)
+   */
+  async _runPeerReview({ step, primaryResult, state, pipelineId, stepIndex }) {
+    const { reviewer, maxRounds = 2, focus = null } = step.peerReview;
+
+    const reviewerMeta = await this.bmadBackend.getAgentMetadata(reviewer);
+    const reviewerTitle = reviewerMeta.title || reviewerMeta.name || reviewer;
+    const reviewerIcon = reviewerMeta.icon || '🔍';
+
+    const primaryMeta = await this.bmadBackend.getAgentMetadata(step.agent);
+    const primaryTitle = primaryMeta.title || primaryMeta.name || step.agent;
+
+    this.emit('pipeline:review:start', {
+      pipelineId, stepIndex,
+      reviewer, reviewerIcon, reviewerTitle,
+      primaryAgent: step.agent, primaryTitle,
+      maxRounds
+    });
+
+    let currentResult = primaryResult;
+    let rounds = [];
+
+    for (let round = 1; round <= maxRounds; round++) {
+      // ── Reviewer challenges ──────────────────────────────────────────
+      const focusHint = focus ? `\nFocalise-toi particulièrement sur : ${focus}` : '';
+      const reviewPrompt = [
+        `Tu es ${reviewerTitle} et tu examines le livrable produit par ${primaryTitle}.`,
+        focusHint,
+        '',
+        '--- LIVRABLE À RÉVISER ---',
+        currentResult.response,
+        '--- FIN DU LIVRABLE ---',
+        '',
+        `Ta mission (tour ${round}/${maxRounds}) :`,
+        '- Identifie les problèmes bloquants, incohérences ou lacunes importantes.',
+        '- Sois constructif et précis.',
+        '- 5 critiques maximum.',
+        '',
+        `Si le livrable est satisfaisant, réponds UNIQUEMENT par :`,
+        'VALIDÉ: [raison en une phrase]',
+        '',
+        'Sinon, liste tes critiques en commençant par le plus bloquant.'
+      ].join('\n');
+
+      const critiqueResult = await this.delegateToAgent(null, reviewer, reviewPrompt, {
+        saveAsArtifact: false
+      });
+      const critique = critiqueResult.response.trim();
+
+      rounds.push({ round, type: 'challenge', reviewer, reviewerIcon, critique });
+
+      this.emit('pipeline:review:challenge', {
+        pipelineId, stepIndex,
+        reviewer, reviewerIcon, reviewerTitle,
+        critique: critique.slice(0, 400),
+        round, maxRounds
+      });
+
+      // ── Check for acceptance ─────────────────────────────────────────
+      const isAccepted = /^VALID[EÉ]\s*:/i.test(critique);
+      if (isAccepted) {
+        const reason = critique.replace(/^VALID[EÉ]\s*:\s*/i, '').slice(0, 200);
+        this.emit('pipeline:review:accepted', {
+          pipelineId, stepIndex,
+          reviewer, reviewerIcon, reviewerTitle,
+          reason, by: 'signal', rounds: rounds.length
+        });
+        break;
+      }
+
+      // ── Primary agent revises (only if not last round) ───────────────
+      if (round < maxRounds) {
+        const revisionPrompt = [
+          `${reviewerTitle} a examiné ton livrable et a des remarques.`,
+          '',
+          '--- CRITIQUE ---',
+          critique,
+          '--- FIN DE LA CRITIQUE ---',
+          '',
+          'Revois ton livrable précédent en tenant compte de ces points.',
+          'Produis une version améliorée et COMPLÈTE (pas juste les corrections — l\'intégralité du document).',
+          `Instructions originales rappelées : ${step.task}`
+        ].join('\n');
+
+        const revisedResult = await this.delegateToAgent(null, step.agent, revisionPrompt, {
+          saveAsArtifact: false
+        });
+
+        rounds.push({ round, type: 'revision', agent: step.agent, agentIcon: primaryResult.agentIcon });
+
+        this.emit('pipeline:review:revision', {
+          pipelineId, stepIndex,
+          agent: step.agent, agentTitle: primaryTitle,
+          agentIcon: primaryResult.agentIcon || '🤖',
+          round, maxRounds
+        });
+
+        currentResult = {
+          ...revisedResult,
+          // Keep original metadata for pipeline bookkeeping
+          agentIcon: primaryResult.agentIcon,
+          agentTitle: primaryResult.agentTitle,
+          peerReviewRounds: rounds
+        };
+      } else {
+        // Exhausted rounds — keep last revision
+        this.emit('pipeline:review:accepted', {
+          pipelineId, stepIndex,
+          reviewer, reviewerIcon, reviewerTitle,
+          reason: `${maxRounds} tours de révision terminés`,
+          by: 'rounds', rounds: rounds.length
+        });
+      }
+    }
+
+    return {
+      ...currentResult,
+      peerReviewRounds: rounds
+    };
   }
 
   _buildStepPrompt(step, previousOutput, contextSummary, allPreviousResults = []) {
@@ -1006,12 +1167,15 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
       {
         id: 'full-product-design',
         name: 'Conception produit complète',
-        description: 'Analyste → PM (PRD + Épics/Stories) → PO (Backlog) → Architecte → UX',
+        description: 'Analyste → PM (PRD + Épics/Stories) → PO (Backlog) → Architecte → UX — avec revue croisée',
         steps: [
           { agent: 'analyst', task: 'Étude de marché et besoins', instructions: ANALYST_INSTRUCTIONS, artifactType: 'analysis', saveArtifact: true },
-          { agent: 'pm', task: 'Rédaction PRD avec Épics et User Stories', instructions: PM_PRD_INSTRUCTIONS, artifactType: 'prd', saveArtifact: true },
-          { agent: 'po', task: 'Validation et backlog priorisé', instructions: PO_BACKLOG_INSTRUCTIONS, artifactType: 'backlog', saveArtifact: true },
-          { agent: 'architect', task: 'Architecture technique', instructions: ARCHITECT_INSTRUCTIONS, artifactType: 'architecture', saveArtifact: true },
+          { agent: 'pm', task: 'Rédaction PRD avec Épics et User Stories', instructions: PM_PRD_INSTRUCTIONS, artifactType: 'prd', saveArtifact: true,
+            peerReview: { reviewer: 'analyst', maxRounds: 2, focus: 'cohérence entre l\'analyse des besoins et les user stories' } },
+          { agent: 'po', task: 'Validation et backlog priorisé', instructions: PO_BACKLOG_INSTRUCTIONS, artifactType: 'backlog', saveArtifact: true,
+            peerReview: { reviewer: 'pm', maxRounds: 1, focus: 'couverture complète des épics du PRD et faisabilité du Sprint 1' } },
+          { agent: 'architect', task: 'Architecture technique', instructions: ARCHITECT_INSTRUCTIONS, artifactType: 'architecture', saveArtifact: true,
+            peerReview: { reviewer: 'po', maxRounds: 1, focus: 'correspondance entre l\'architecture et les user stories du backlog' } },
           { agent: 'ux-expert', task: 'Design UX/UI', instructions: UX_DESIGN_INSTRUCTIONS, artifactType: 'design', saveArtifact: true }
         ]
       },
@@ -1033,9 +1197,12 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
         requiresWorkspace: true,
         steps: [
           { agent: 'analyst', task: 'Analyse des besoins et faisabilité', instructions: ANALYST_INSTRUCTIONS, artifactType: 'analysis', saveArtifact: true },
-          { agent: 'pm', task: 'PRD avec Épics et User Stories', instructions: PM_PRD_INSTRUCTIONS, artifactType: 'prd', saveArtifact: true },
-          { agent: 'po', task: 'Backlog priorisé et critères d\'acceptation', instructions: PO_BACKLOG_INSTRUCTIONS, artifactType: 'backlog', saveArtifact: true },
-          { agent: 'architect', task: 'Architecture technique et structure fichiers', instructions: ARCHITECT_INSTRUCTIONS, artifactType: 'architecture', saveArtifact: true },
+          { agent: 'pm', task: 'PRD avec Épics et User Stories', instructions: PM_PRD_INSTRUCTIONS, artifactType: 'prd', saveArtifact: true,
+            peerReview: { reviewer: 'analyst', maxRounds: 2, focus: 'cohérence entre l\'analyse et les user stories' } },
+          { agent: 'po', task: 'Backlog priorisé et critères d\'acceptation', instructions: PO_BACKLOG_INSTRUCTIONS, artifactType: 'backlog', saveArtifact: true,
+            peerReview: { reviewer: 'pm', maxRounds: 1, focus: 'couverture complète des épics et faisabilité Sprint 1' } },
+          { agent: 'architect', task: 'Architecture technique et structure fichiers', instructions: ARCHITECT_INSTRUCTIONS, artifactType: 'architecture', saveArtifact: true,
+            peerReview: { reviewer: 'po', maxRounds: 1, focus: 'faisabilité technique des user stories du backlog' } },
           { agent: 'ux-expert', task: 'Design UX/UI', instructions: UX_DESIGN_INSTRUCTIONS, artifactType: 'design', saveArtifact: true },
           { agent: 'dev', task: 'Génération du code complet', instructions: FULL_APP_CODE_INSTRUCTIONS, artifactType: 'code', saveArtifact: true, extractCode: true },
           { agent: 'qa', task: 'Tests et validation de la couverture', instructions: QA_TEST_INSTRUCTIONS, artifactType: 'test', saveArtifact: true, extractCode: true },
@@ -1083,21 +1250,24 @@ Réponds de manière concise et actionnable. Concentre-toi sur ton domaine d'exp
             task: 'Spécifications fonctionnelles',
             instructions: FUNCTIONAL_SPEC_INSTRUCTIONS,
             artifactType: 'documentation',
-            saveArtifact: true
+            saveArtifact: true,
+            peerReview: { reviewer: 'analyst', maxRounds: 2, focus: 'cohérence entre les specs fonctionnelles et l\'étude de marché' }
           },
           {
             agent: 'architect',
             task: 'Spécifications techniques',
             instructions: TECHNICAL_SPEC_INSTRUCTIONS,
             artifactType: 'architecture',
-            saveArtifact: true
+            saveArtifact: true,
+            peerReview: { reviewer: 'pm', maxRounds: 2, focus: 'alignement des specs techniques avec les exigences fonctionnelles' }
           },
           {
             agent: 'pm',
             task: 'Roadmap produit',
             instructions: ROADMAP_INSTRUCTIONS,
             artifactType: 'documentation',
-            saveArtifact: true
+            saveArtifact: true,
+            peerReview: { reviewer: 'analyst', maxRounds: 1, focus: 'réalisme des objectifs au regard de l\'étude de marché' }
           }
         ]
       }

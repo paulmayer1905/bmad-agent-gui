@@ -138,17 +138,19 @@ export default function PartyChat() {
   useEffect(() => {
     const cleanupStart = api.coord.onPipelineStepStart((data) => {
       setPipelineSteps(prev => prev.map((s, i) =>
-        i === data.stepIndex ? { ...s, status: 'running' } : s
+        i === data.stepIndex ? { ...s, status: 'running', reviewState: null } : s
       ));
     });
     const cleanupDone = api.coord.onPipelineStepDone((data) => {
       setPipelineSteps(prev => prev.map((s, i) =>
-        i === data.stepIndex ? { ...s, status: 'completed', response: data.response, usage: data.usage } : s
+        i === data.stepIndex
+          ? { ...s, status: 'completed', response: data.response, usage: data.usage, reviewState: null, reviewRounds: data.reviewRounds || s.reviewRounds || 0 }
+          : s
       ));
     });
     const cleanupError = api.coord.onPipelineStepError((data) => {
       setPipelineSteps(prev => prev.map((s, i) =>
-        i === data.stepIndex ? { ...s, status: 'failed', error: data.error } : s
+        i === data.stepIndex ? { ...s, status: 'failed', error: data.error, reviewState: null } : s
       ));
     });
     const cleanupFiles = api.workspace.onFilesWritten((data) => {
@@ -156,11 +158,46 @@ export default function PartyChat() {
         i === data.stepIndex ? { ...s, filesWritten: data.files.length } : s
       ));
     });
+
+    // ── Peer review events ──────────────────────────────────────────────
+    const cleanupReviewStart = api.coord.onPipelineReviewStart((data) => {
+      setPipelineSteps(prev => prev.map((s, i) =>
+        i === data.stepIndex
+          ? { ...s, status: 'reviewing', reviewState: { phase: 'challenge', reviewerTitle: data.reviewerTitle, reviewerIcon: data.reviewerIcon, round: 1, maxRounds: data.maxRounds } }
+          : s
+      ));
+    });
+    const cleanupReviewChallenge = api.coord.onPipelineReviewChallenge((data) => {
+      setPipelineSteps(prev => prev.map((s, i) =>
+        i === data.stepIndex
+          ? { ...s, status: 'reviewing', reviewState: { phase: 'challenge', reviewerTitle: data.reviewerTitle, reviewerIcon: data.reviewerIcon, round: data.round, maxRounds: data.maxRounds, lastCritique: data.critique } }
+          : s
+      ));
+    });
+    const cleanupReviewRevision = api.coord.onPipelineReviewRevision((data) => {
+      setPipelineSteps(prev => prev.map((s, i) =>
+        i === data.stepIndex
+          ? { ...s, status: 'reviewing', reviewState: { phase: 'revision', agentTitle: data.agentTitle, agentIcon: data.agentIcon, round: data.round, maxRounds: data.maxRounds } }
+          : s
+      ));
+    });
+    const cleanupReviewAccepted = api.coord.onPipelineReviewAccepted((data) => {
+      setPipelineSteps(prev => prev.map((s, i) =>
+        i === data.stepIndex
+          ? { ...s, reviewState: null, reviewRounds: data.rounds || 0 }
+          : s
+      ));
+    });
+
     return () => {
       if (cleanupStart) cleanupStart();
       if (cleanupDone) cleanupDone();
       if (cleanupError) cleanupError();
       if (cleanupFiles) cleanupFiles();
+      if (cleanupReviewStart) cleanupReviewStart();
+      if (cleanupReviewChallenge) cleanupReviewChallenge();
+      if (cleanupReviewRevision) cleanupReviewRevision();
+      if (cleanupReviewAccepted) cleanupReviewAccepted();
     };
   }, []);
 

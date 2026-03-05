@@ -259,11 +259,27 @@ function registerIpcHandlers() {
     const onFilesWritten = (data) => {
       if (!mainWindow.isDestroyed()) mainWindow.webContents.send('pipeline:files:written', data);
     };
+    const onReviewStart = (data) => {
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('pipeline:review:start', data);
+    };
+    const onReviewChallenge = (data) => {
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('pipeline:review:challenge', data);
+    };
+    const onReviewRevision = (data) => {
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('pipeline:review:revision', data);
+    };
+    const onReviewAccepted = (data) => {
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('pipeline:review:accepted', data);
+    };
 
     coordinator.on('pipeline:step:start', onStepStart);
     coordinator.on('pipeline:step:done', onStepDone);
     coordinator.on('pipeline:step:error', onStepError);
     coordinator.on('pipeline:files:written', onFilesWritten);
+    coordinator.on('pipeline:review:start', onReviewStart);
+    coordinator.on('pipeline:review:challenge', onReviewChallenge);
+    coordinator.on('pipeline:review:revision', onReviewRevision);
+    coordinator.on('pipeline:review:accepted', onReviewAccepted);
 
     try {
       const result = await backend.executePipeline(pipeline, options);
@@ -281,6 +297,10 @@ function registerIpcHandlers() {
       coordinator.removeListener('pipeline:step:done', onStepDone);
       coordinator.removeListener('pipeline:step:error', onStepError);
       coordinator.removeListener('pipeline:files:written', onFilesWritten);
+      coordinator.removeListener('pipeline:review:start', onReviewStart);
+      coordinator.removeListener('pipeline:review:challenge', onReviewChallenge);
+      coordinator.removeListener('pipeline:review:revision', onReviewRevision);
+      coordinator.removeListener('pipeline:review:accepted', onReviewAccepted);
     }
   });
 

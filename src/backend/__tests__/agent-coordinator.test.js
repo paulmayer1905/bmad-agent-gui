@@ -600,4 +600,320 @@ describe('AgentCoordinator', () => {
       expect(coordinator.removeListener).toBeDefined();
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  Peer Review — _runPeerReview()
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('_runPeerReview()', () => {
+    /**
+     * Build a minimal fake primaryResult as delegateToAgent would return.
+     */
+    function makePrimaryResult(response = 'Original deliverable text.') {
+      return {
+        agentName: 'pm',
+        agentTitle: 'Product Manager',
+        agentIcon: '📋',
+        question: 'Write a spec',
+        response,
+        usage: { inputTokens: 100, outputTokens: 80 }
+      };
+    }
+
+    /**
+     * Build a minimal step definition that includes peerReview config.
+     */
+    function makeStep(peerReviewOverrides = {}) {
+      return {
+        agent: 'pm',
+        task: 'Write a functional spec',
+        saveArtifact: false,
+        peerReview: {
+          reviewer: 'analyst',
+          maxRounds: 2,
+          ...peerReviewOverrides
+        }
+      };
+    }
+
+    /**
+     * Build a minimal pipeline state.
+     */
+    function makeState() {
+      return {
+        steps: [makeStep()],
+        results: [],
+        currentStep: 0
+      };
+    }
+
+    // ── Helper that spies on delegateToAgent with a sequence of responses ──
+
+    function mockDelegateSequence(coordinator, responses) {
+      let callIndex = 0;
+      jest.spyOn(coordinator, 'delegateToAgent').mockImplementation(
+        async (fromSessionId, agentName, prompt, opts) => {
+          const response = responses[callIndex] ?? `Default response ${callIndex}`;
+          callIndex++;
+          return {
+            agentName,
+            agentTitle: agentName,
+            agentIcon: '🤖',
+            question: prompt,
+            response,
+            usage: { inputTokens: 50, outputTokens: 30 }
+          };
+        }
+      );
+    }
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('emits pipeline:review:start at the beginning', async () => {
+      // Reviewer immediately validates
+      mockDelegateSequence(coordinator, ['VALIDÉ: Looks great']);
+
+      const events = [];
+      coordinator.on('pipeline:review:start', (d) => events.push({ type: 'start', ...d }));
+
+      await coordinator._runPeerReview({
+        step: makeStep(),
+        primaryResult: makePrimaryResult(),
+        state: makeState(),
+        pipelineId: 'pipe-1',
+        stepIndex: 0
+      });
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        type: 'start',
+        pipelineId: 'pipe-1',
+        stepIndex: 0,
+        reviewer: 'analyst',
+        primaryAgent: 'pm',
+        maxRounds: 2
+      });
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('accepts immediately when reviewer returns VALIDÉ: signal', async () => {
+      // round 1: reviewer says VALIDÉ
+      mockDelegateSequence(coordinator, ['VALIDÉ: No issues found']);
+
+      const acceptedEvents = [];
+      const challengeEvents = [];
+      coordinator.on('pipeline:review:accepted', (d) => acceptedEvents.push(d));
+      coordinator.on('pipeline:review:challenge', (d) => challengeEvents.push(d));
+
+      const result = await coordinator._runPeerReview({
+        step: makeStep({ maxRounds: 3 }),
+        primaryResult: makePrimaryResult('My spec'),
+        state: makeState(),
+        pipelineId: 'pipe-2',
+        stepIndex: 0
+      });
+
+      // Only 1 challenge call (reviewer), 0 revision calls
+      expect(coordinator.delegateToAgent).toHaveBeenCalledTimes(1);
+      expect(challengeEvents).toHaveLength(1);
+
+      // Accepted event with by: 'signal'
+      expect(acceptedEvents).toHaveLength(1);
+      expect(acceptedEvents[0].by).toBe('signal');
+      expect(acceptedEvents[0].rounds).toBe(1);
+
+      // Returned result keeps original response (no revision happened)
+      expect(result.response).toBe('My spec');
+      expect(result.peerReviewRounds).toHaveLength(1);
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('also accepts with VALIDE: (no accent) signal', async () => {
+      mockDelegateSequence(coordinator, ['VALIDE: acceptable']);
+
+      const acceptedEvents = [];
+      coordinator.on('pipeline:review:accepted', (d) => acceptedEvents.push(d));
+
+      await coordinator._runPeerReview({
+        step: makeStep({ maxRounds: 2 }),
+        primaryResult: makePrimaryResult(),
+        state: makeState(),
+        pipelineId: 'pipe-3',
+        stepIndex: 0
+      });
+
+      expect(acceptedEvents[0].by).toBe('signal');
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('triggers revision when reviewer challenges, then accepts in round 2', async () => {
+      // round 1: reviewer challenges
+      // round 1: primary revises
+      // round 2: reviewer validates
+      mockDelegateSequence(coordinator, [
+        'Issue 1: Missing scope. Issue 2: No KPIs.',
+        'Revised spec with scope and KPIs.',
+        'VALIDÉ: Much better now'
+      ]);
+
+      const revisionEvents = [];
+      const acceptedEvents = [];
+      coordinator.on('pipeline:review:revision', (d) => revisionEvents.push(d));
+      coordinator.on('pipeline:review:accepted', (d) => acceptedEvents.push(d));
+
+      const result = await coordinator._runPeerReview({
+        step: makeStep({ maxRounds: 2 }),
+        primaryResult: makePrimaryResult('Original spec'),
+        state: makeState(),
+        pipelineId: 'pipe-4',
+        stepIndex: 1
+      });
+
+      // 3 delegateToAgent calls: challenge R1, revision R1, challenge R2
+      expect(coordinator.delegateToAgent).toHaveBeenCalledTimes(3);
+
+      // Revision event emitted
+      expect(revisionEvents).toHaveLength(1);
+      expect(revisionEvents[0]).toMatchObject({ round: 1, maxRounds: 2 });
+
+      // Accepted by signal
+      expect(acceptedEvents[0].by).toBe('signal');
+
+      // Final response is the revised content
+      expect(result.response).toBe('Revised spec with scope and KPIs.');
+
+      // peerReviewRounds tracks challenge + revision
+      expect(result.peerReviewRounds).toHaveLength(3); // challenge-R1, revision-R1, challenge-R2
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('exhausts all rounds when reviewer never validates', async () => {
+      // maxRounds: 2 → challenge R1, revision R1, challenge R2 → exhausted (no revision on last round)
+      mockDelegateSequence(coordinator, [
+        'Critique round 1: needs improvement.',
+        'Improved version v2.',
+        'Critique round 2: still issues.'
+      ]);
+
+      const acceptedEvents = [];
+      coordinator.on('pipeline:review:accepted', (d) => acceptedEvents.push(d));
+
+      const result = await coordinator._runPeerReview({
+        step: makeStep({ maxRounds: 2 }),
+        primaryResult: makePrimaryResult('v1'),
+        state: makeState(),
+        pipelineId: 'pipe-5',
+        stepIndex: 0
+      });
+
+      // challenge R1 + revision R1 + challenge R2 = 3 calls
+      expect(coordinator.delegateToAgent).toHaveBeenCalledTimes(3);
+
+      // Accepted "by rounds"
+      expect(acceptedEvents).toHaveLength(1);
+      expect(acceptedEvents[0].by).toBe('rounds');
+
+      // Final result is last revision
+      expect(result.response).toBe('Improved version v2.');
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('with maxRounds: 1 — challenge only, no revision on exhaustion', async () => {
+      mockDelegateSequence(coordinator, ['Still needs work.']);
+
+      const revisionEvents = [];
+      coordinator.on('pipeline:review:revision', (d) => revisionEvents.push(d));
+
+      const result = await coordinator._runPeerReview({
+        step: makeStep({ maxRounds: 1 }),
+        primaryResult: makePrimaryResult('Spec v1'),
+        state: makeState(),
+        pipelineId: 'pipe-6',
+        stepIndex: 0
+      });
+
+      // Only 1 call: reviewer challenge in round 1 (no revision since round === maxRounds)
+      expect(coordinator.delegateToAgent).toHaveBeenCalledTimes(1);
+      expect(revisionEvents).toHaveLength(0);
+
+      // Result unchanged from primary
+      expect(result.response).toBe('Spec v1');
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('peerReviewRounds array contains typed entries', async () => {
+      // challenge R1, revision R1, challenge R2 (VALIDÉ)
+      mockDelegateSequence(coordinator, [
+        'critique text',
+        'revised output',
+        'VALIDÉ: great'
+      ]);
+
+      const result = await coordinator._runPeerReview({
+        step: makeStep({ maxRounds: 2 }),
+        primaryResult: makePrimaryResult(),
+        state: makeState(),
+        pipelineId: 'pipe-7',
+        stepIndex: 0
+      });
+
+      const rounds = result.peerReviewRounds;
+
+      expect(rounds[0]).toMatchObject({ type: 'challenge', reviewer: 'analyst', round: 1 });
+      expect(rounds[1]).toMatchObject({ type: 'revision', agent: 'pm', round: 1 });
+      expect(rounds[2]).toMatchObject({ type: 'challenge', reviewer: 'analyst', round: 2 });
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('pipeline with peerReview emits reviewRounds in pipeline:step:done', async () => {
+      // Simulate a full pipeline execution with peerReview on step 0
+      // delegateToAgent will be called: primary step, then reviewer (VALIDÉ immediately)
+      const callResponses = ['Great primary output', 'VALIDÉ: approved'];
+      let callIdx = 0;
+      jest.spyOn(coordinator, 'delegateToAgent').mockImplementation(async (from, agent, prompt, opts) => {
+        const response = callResponses[callIdx++] ?? 'fallback';
+        return {
+          agentName: agent,
+          agentTitle: agent,
+          agentIcon: '🤖',
+          question: prompt,
+          response,
+          usage: { inputTokens: 10, outputTokens: 10 }
+        };
+      });
+
+      const stepDoneEvents = [];
+      coordinator.on('pipeline:step:done', (d) => stepDoneEvents.push(d));
+
+      await coordinator.executePipeline({
+        name: 'Test peer review pipeline',
+        steps: [{
+          agent: 'pm',
+          task: 'Write spec',
+          saveArtifact: false,
+          peerReview: { reviewer: 'analyst', maxRounds: 2 }
+        }]
+      });
+
+      expect(stepDoneEvents).toHaveLength(1);
+      // Reviewer validated in round 1 → 1 review round recorded
+      expect(stepDoneEvents[0].reviewRounds).toBe(1);
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    test('pipeline without peerReview emits reviewRounds: 0', async () => {
+      const stepDoneEvents = [];
+      coordinator.on('pipeline:step:done', (d) => stepDoneEvents.push(d));
+
+      await coordinator.executePipeline({
+        name: 'No peer review',
+        steps: [{ agent: 'analyst', task: 'Analyze', saveArtifact: false }]
+      });
+
+      expect(stepDoneEvents[0].reviewRounds).toBe(0);
+    });
+  });
 });

@@ -126,6 +126,22 @@ contextBridge.exposeInMainWorld('bmadAPI', {
       ipcRenderer.on('pipeline:step:error', (_, data) => callback(data));
       return () => ipcRenderer.removeAllListeners('pipeline:step:error');
     },
+    onPipelineReviewStart: (callback) => {
+      ipcRenderer.on('pipeline:review:start', (_, data) => callback(data));
+      return () => ipcRenderer.removeAllListeners('pipeline:review:start');
+    },
+    onPipelineReviewChallenge: (callback) => {
+      ipcRenderer.on('pipeline:review:challenge', (_, data) => callback(data));
+      return () => ipcRenderer.removeAllListeners('pipeline:review:challenge');
+    },
+    onPipelineReviewRevision: (callback) => {
+      ipcRenderer.on('pipeline:review:revision', (_, data) => callback(data));
+      return () => ipcRenderer.removeAllListeners('pipeline:review:revision');
+    },
+    onPipelineReviewAccepted: (callback) => {
+      ipcRenderer.on('pipeline:review:accepted', (_, data) => callback(data));
+      return () => ipcRenderer.removeAllListeners('pipeline:review:accepted');
+    },
 
     startParty: (agentNames) => ipcRenderer.invoke('coord:party:start', agentNames),
     sendPartyMessage: (partyId, message, options) => ipcRenderer.invoke('coord:party:send', partyId, message, options),
